@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 00｜当前代码盘点与证据边界
 
 > 目的：让下一位开发者明确“已有事实 / 计划 / 未验证”，防止把 67 项 JSON 测试误当成真实会议系统已可用。
@@ -14,13 +16,13 @@
 
 | 能力 | 判断 | 当前唯一事实源 |
 |---|---|---|
-| Python 打包与 CLI 入口 | 已实现 | [pyproject.toml](../pyproject.toml)、[src/meeting_reservation/cli.py](../src/meeting_reservation/cli.py) |
-| 5 种 JSON 消息的 Schema | 已实现，**未对外冻结** | [docs/CONTRACT.md](../docs/CONTRACT.md) 和 [src/meeting_reservation/contract.py](../src/meeting_reservation/contract.py) |
-| CREATE、CHECK、UPDATE、OTHER 意图结构 | 已实现契约，不是业务执行 | [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) |
-| 相对时间偏移与字段修改合并 | 已实现契约 | [tests/test_unified_update.py](../tests/test_unified_update.py) |
-| 契约校验、时间顺序判断、本地 URN 引用 | 已实现 | [src/meeting_reservation/contract.py](../src/meeting_reservation/contract.py) |
-| JSON 示例与回归 | 已验证 | [tests/test_contracts.py](../tests/test_contracts.py)、[tests/test_cli.py](../tests/test_cli.py) |
-| 阶段一设计与历史验证记录 | 已存在 | [docs/PHASE1.md](../docs/PHASE1.md) |
+| Python 打包与 CLI 入口 | 已实现 | [pyproject.toml](../../pyproject.toml)、[src/meeting_reservation/cli.py](../../src/meeting_reservation/cli.py) |
+| 5 种 JSON 消息的 Schema | 已实现，**未对外冻结** | [docs/CONTRACT.md](../../docs/CONTRACT.md) 和 [src/meeting_reservation/contract.py](../../src/meeting_reservation/contract.py) |
+| CREATE、CHECK、UPDATE、OTHER 意图结构 | 已实现契约，不是业务执行 | [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) |
+| 相对时间偏移与字段修改合并 | 已实现契约 | [tests/test_unified_update.py](../../tests/test_unified_update.py) |
+| 契约校验、时间顺序判断、本地 URN 引用 | 已实现 | [src/meeting_reservation/contract.py](../../src/meeting_reservation/contract.py) |
+| JSON 示例与回归 | 已验证 | [tests/test_contracts.py](../../tests/test_contracts.py)、[tests/test_cli.py](../../tests/test_cli.py) |
+| 阶段一设计与历史验证记录 | 已存在 | [docs/PHASE1.md](../../docs/PHASE1.md) |
 
 注意：现有 UPDATE 的真实结构是 **update.time_shift_minutes + update.changes**，可同时修改非时间字段；不是早期讨论过的 SHIFT/PATCH 双模式，开发时必须以现有 Schema 为准。
 
@@ -38,7 +40,7 @@ $env:PYTHONPATH = (Join-Path (Get-Location) 'src')
 
 **实际结果：** pytest 67 passed；ruff All checks passed；18 份示例均校验通过；命令各退出码为 0。
 
-证据仅覆盖当前源码所实现的结构、CLI 和校验器；本轮未重新执行 wheel 打包，也未运行 MCP/ADP/企业微信/真实会议系统测试。过去的 wheel 检查记录在 [docs/PHASE1.md](../docs/PHASE1.md)，不扩张为本轮运行证据。
+证据仅覆盖当前源码所实现的结构、CLI 和校验器；本轮未重新执行 wheel 打包，也未运行 MCP/ADP/企业微信/真实会议系统测试。过去的 wheel 检查记录在 [docs/PHASE1.md](../../docs/PHASE1.md)，不扩张为本轮运行证据。
 
 ## 4. 还没有实现的能力
 
@@ -58,13 +60,13 @@ $env:PYTHONPATH = (Join-Path (Get-Location) 'src')
 ## 5. 已识别的设计/接口断口
 
 **D01 — NEED_INPUT 不能直接在同一 pending 申请上补字段（高优先级）。**
-当前 [src/meeting_reservation/schemas/meeting-result.v1.schema.json](../src/meeting_reservation/schemas/meeting-result.v1.schema.json) 支持 NEED_INPUT + pending ID；但 [src/meeting_reservation/schemas/meeting-continue.v1.schema.json](../src/meeting_reservation/schemas/meeting-continue.v1.schema.json) 只支持 SELECT_OPTION/CANCEL，无法上传“补充结束时间”等自由参数。因此未来业务流程若直接设计“追问后继续”，会在契约边界断开。**当前只是未来设计缺口，不是本轮 67 项测试失败。**
+当前 [src/meeting_reservation/schemas/meeting-result.v1.schema.json](../../src/meeting_reservation/schemas/meeting-result.v1.schema.json) 支持 NEED_INPUT + pending ID；但 [src/meeting_reservation/schemas/meeting-continue.v1.schema.json](../../src/meeting_reservation/schemas/meeting-continue.v1.schema.json) 只支持 SELECT_OPTION/CANCEL，无法上传“补充结束时间”等自由参数。因此未来业务流程若直接设计“追问后继续”，会在契约边界断开。**当前只是未来设计缺口，不是本轮 67 项测试失败。**
 
 **D02 — COMMITTED 的可结构化回执不足。**
 当前结果以 meeting_id/message 为主，无法由正式字段单独确定最终时间、会议室和参会人。后续应由会议系统已验证回读，或在结果契约增加经过后端确认的会议摘要，ADP 不得凭旧提取字段自行宣布最终时段。
 
 **D03 — 幂等键的稳定来源未定义为实际实现。**
-[docs/CONTRACT.md](../docs/CONTRACT.md) 明确禁止直接假设 SYS.RequestId 就是稳定业务操作 ID，但尚没有代码生成/保存/重用该 ID；没有这一事实不应打开写操作重试。
+[docs/CONTRACT.md](../../docs/CONTRACT.md) 明确禁止直接假设 SYS.RequestId 就是稳定业务操作 ID，但尚没有代码生成/保存/重用该 ID；没有这一事实不应打开写操作重试。
 
 **D04 — 验证与外部事实缺失。**
 真实会议 API、权限、资源 ID、提交原子性、ADP 的 $ref/structuredContent 适配、企微身份映射都未经过本地工程实测。

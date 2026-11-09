@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 06｜测试矩阵、验收证据与受控交付
 
 > 这里是**将来要执行的验收计划**，不代表测试已经运行。当前仅阶段一契约测试有新鲜证据，见 [roadmap/00-current-state.md](00-current-state.md)。
@@ -67,7 +69,7 @@ AC03 和 AC06 依赖 [roadmap/02-contract-and-decisions.md](02-contract-and-deci
 
 ## 4. 当前可复验的实际命令
 
-请按项目已有 README 运行；其正式入口见 [README.md](../README.md)，测试事实源见 [tests/test_contracts.py](../tests/test_contracts.py)、[tests/test_unified_update.py](../tests/test_unified_update.py)。
+请按项目已有 README 运行；其正式入口见 [README.md](../../README.md)，测试事实源见 [tests/test_contracts.py](../../tests/test_contracts.py)、[tests/test_unified_update.py](../../tests/test_unified_update.py)。
 
 ~~~powershell
 Set-Location -LiteralPath 'E:\work\05_ADP\03_Meeting_reservation'

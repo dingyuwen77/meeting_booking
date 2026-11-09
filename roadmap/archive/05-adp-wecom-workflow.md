@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 05｜ADP 工作流与企业微信多轮交互
 
 > 仅在 G1 契约候选明确、G2 最小 MCP 联通试验通过、G3 业务执行具备可验证的服务端行为后，才进入完整工作流开发。**目前未实现。**
@@ -45,7 +47,7 @@
 
 建议对输出进行以下业务约束（提示词是提示层，最终还必须经运行时校验）：
 
-- 只能输出当前 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 允许的形状，不要输出自创字段。
+- 只能输出当前 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 允许的形状，不要输出自创字段。
 - 查询空闲识别为 CHECK，不能因为存在完整时间和地点就自动当 CREATE。
 - “改会”要有定位线索；相对时间平移保留为 time_shift_minutes，不从缺失的原会议开始时间推造绝对时间。
 - 自然语言会议室、人员只是 query，真正 ID 由 MCP 解析；重名必须澄清。

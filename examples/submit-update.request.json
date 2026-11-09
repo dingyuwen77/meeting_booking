@@ -12,7 +12,7 @@
     "update": {
       "time_shift_minutes": 60,
       "changes": {
-        "room_query": "A302"
+        "room_query": "bizvideo-room:1001"
       }
     }
   }

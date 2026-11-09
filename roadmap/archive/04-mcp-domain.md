@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 04｜MCP 业务闭环：创建、改会、冲突、幂等
 
 > 当前状态：**计划，未实现。** 本篇解释真实业务代码将承担的逻辑，不把结果 Schema 或 Fake 测试当成真实会议提交。
@@ -10,7 +12,7 @@
 | continue_meeting_request | 继续同一用户的 pending 请求：选项、取消、补参/修订（需先完成 C01/C02 契约） | meeting.continue.v1 → meeting.result.v1 |
 | get_meeting_operation | 查询原业务操作的最终/中间状态 | meeting.operation-query.v1 → meeting.result.v1 |
 
-输入 Schema、输出 Schema 必须取自当前项目已维护的机器契约（详见 [docs/CONTRACT.md](../docs/CONTRACT.md)），不是在 MCP 实现中再手写一份不一致的类型。
+输入 Schema、输出 Schema 必须取自当前项目已维护的机器契约（详见 [docs/CONTRACT.md](../../docs/CONTRACT.md)），不是在 MCP 实现中再手写一份不一致的类型。
 
 ## 2. 单次提交的正确顺序
 
@@ -47,7 +49,7 @@
 1. 先通过 meeting_id 或检索条件定位会议；多匹配返回 NEED_SELECTION。
 2. 校验用户对目标会议的读取/修改权限，不能让自然语言“我要修改”提升权限。
 3. 读取原 start/end、room、参会人、业务版本；相对平移基于原值计算，保留原持续时长。
-4. 应用 update.changes 里的差量，不出现的字段不修改；参会人名单替换/清空语义由当前 [docs/CONTRACT.md](../docs/CONTRACT.md) 负责。
+4. 应用 update.changes 里的差量，不出现的字段不修改；参会人名单替换/清空语义由当前 [docs/CONTRACT.md](../../docs/CONTRACT.md) 负责。
 5. 排除原会议自身占用进行冲突检查，使用条件更新或等价版本保护，失败时不覆盖其他人的新修改。
 6. 成功时返回**原会议更新后**的真实 meeting_id 和确认过的详情，不创建第二场会议。
 

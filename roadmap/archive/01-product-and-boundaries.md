@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 01｜产品目标、责任边界与关键决策
 
 > 读者：负责 ADP 编排、MCP 工具以及实际会议 API 对接的开发者。本篇回答“为什么这样分层”，不复制机器 Schema。
@@ -34,7 +36,7 @@ MCP result → ADP 确定性分支 → 企业微信用户
 
 ## 4. 当前唯一事实源和协作界面
 
-- JSON 的字段、必填、枚举、修改互斥条件：参见 [docs/CONTRACT.md](../docs/CONTRACT.md)，机器定义位于 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 等 5 份 Schema。
+- JSON 的字段、必填、枚举、修改互斥条件：参见 [docs/CONTRACT.md](../../docs/CONTRACT.md)，机器定义位于 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 等 5 份 Schema。
 - 后续会议业务 Provider 的接口定义，必须从其官方/内部接口文档、实际调用或测试数据取得；目前本地工程**没有**这份事实。
 - ADP 配置/企业微信运行细节以当前腾讯 ADP 官方文档 + 真实租户验证为准，相关官方入口见 [roadmap/03-adp-mcp-spike.md](03-adp-mcp-spike.md)。
 

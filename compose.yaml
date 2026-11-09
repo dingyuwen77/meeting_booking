@@ -1,0 +1,17 @@
+services:
+  meeting-booking:
+    build: .
+    env_file:
+      - .env
+    environment:
+      MEETING_MCP_HOST: "0.0.0.0"
+      MEETING_MCP_PORT: "4561"
+      MEETING_DB_PATH: /app/data/meeting_booking.sqlite3
+    ports:
+      - "127.0.0.1:4561:4561"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true

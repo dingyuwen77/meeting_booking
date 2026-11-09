@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 07｜逐项开发清单与阶段交接（进度唯一入口）
 
 > 用法：每完成一行，先复核对应代码/运行结果，再把本表状态由“未实现/待确认”改成“已验证”；写清测试证据、环境和版本。**当前除阶段一基础外，全部是计划，不是已交付结果。**
@@ -36,7 +38,7 @@
 
 ## 3. 每次开发从哪里改代码
 
-**契约增强（T03/T04）：** 优先从 [docs/CONTRACT.md](../docs/CONTRACT.md) 判断现有契约语义；更新 [src/meeting_reservation/schemas/meeting-continue.v1.schema.json](../src/meeting_reservation/schemas/meeting-continue.v1.schema.json)、[src/meeting_reservation/schemas/meeting-result.v1.schema.json](../src/meeting_reservation/schemas/meeting-result.v1.schema.json)（确实需要才改），复用 [src/meeting_reservation/contract.py](../src/meeting_reservation/contract.py) 与 [tests/test_contracts.py](../tests/test_contracts.py)。若改 UPDATE 相关语义，还需同步 [tests/test_unified_update.py](../tests/test_unified_update.py)。
+**契约增强（T03/T04）：** 优先从 [docs/CONTRACT.md](../../docs/CONTRACT.md) 判断现有契约语义；更新 [src/meeting_reservation/schemas/meeting-continue.v1.schema.json](../../src/meeting_reservation/schemas/meeting-continue.v1.schema.json)、[src/meeting_reservation/schemas/meeting-result.v1.schema.json](../../src/meeting_reservation/schemas/meeting-result.v1.schema.json)（确实需要才改），复用 [src/meeting_reservation/contract.py](../../src/meeting_reservation/contract.py) 与 [tests/test_contracts.py](../../tests/test_contracts.py)。若改 UPDATE 相关语义，还需同步 [tests/test_unified_update.py](../../tests/test_unified_update.py)。
 
 **MCP 新业务代码（T05–T13）：** 当前目录没有 MCP 生产文件、Provider adapter、持久化实现、认证中间件。后续按**真实 SDK、Provider 和项目结构**选择模块及目录，不在 roadmap 创建无事实根据的“必须存在路径”。代码变更需相应新增测试与运行说明，避免只有一份脱离实现的文档。
 
