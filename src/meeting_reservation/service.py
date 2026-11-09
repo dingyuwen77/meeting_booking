@@ -467,6 +467,25 @@ class MeetingService:
     def continue_request(self, actor: Actor, request: dict) -> dict:
         validate_payload("continue", request)
         op_id = request["operation_id"]
+        # A foreign or stale pending request must not reserve an operation_id.
+        # Already-recorded calls skip this precheck so an idempotent retry can
+        # recover its original result after the pending entry was consumed.
+        try:
+            existing = self.store.operation(actor, op_id)
+            if existing is None:
+                self.store.read_pending(
+                    actor, request["pending_request_id"], request["expected_revision"]
+                )
+        except StateError as exc:
+            status = (
+                "DENIED" if exc.code == "DENIED"
+                else "EXPIRED" if exc.code in ("EXPIRED", "STALE_PENDING")
+                else "NOT_FOUND"
+            )
+            return result(
+                op_id, status, "待处理申请不存在、已失效或无权限",
+                error_code=exc.code,
+            )
 
         def run() -> dict:
             intent, options = self.store.read_pending(
