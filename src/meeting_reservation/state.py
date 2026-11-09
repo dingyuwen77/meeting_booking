@@ -8,7 +8,7 @@ import sqlite3
 import time
 import uuid
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,16 +17,19 @@ from .identity import Actor
 
 class StateError(ValueError):
     def __init__(self, code: str):
+        """初始化本模块所需的状态与依赖。"""
         super().__init__(code)
         self.code = code
 
 
 def _dump(value: Any) -> str:
+    """将台账内容序列化为稳定的 UTF-8 JSON 文本。"""
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 class StateStore:
     def __init__(self, path: str):
+        """初始化本模块所需的状态与依赖。"""
         if path == ":memory:":
             raise ValueError("操作台账必须持久化，不能使用内存 SQLite")
         self.path = path
@@ -58,6 +61,7 @@ class StateStore:
             db.commit()
 
     def _connect(self) -> sqlite3.Connection:
+        """为当前事务创建独立 SQLite 连接。"""
         db = sqlite3.connect(self.path, timeout=10)
         db.row_factory = sqlite3.Row
         return db
@@ -95,6 +99,7 @@ class StateStore:
                 raise
 
     def finish(self, op_id: str, result: dict) -> None:
+        """保存已执行操作的结构化结果与最终状态。"""
         with closing(self._connect()) as db:
             db.execute(
                 """UPDATE operations
@@ -105,6 +110,7 @@ class StateStore:
             db.commit()
 
     def operation(self, actor: Actor, op_id: str) -> dict | None:
+        """读取本人操作；未完成记录按时间返回执行中或未知。"""
         with closing(self._connect()) as db:
             row = db.execute(
                 "SELECT * FROM operations WHERE operation_id = ?", (op_id,)
@@ -123,9 +129,10 @@ class StateStore:
     def create_pending(
         self, actor: Actor, intent: dict, options: list[dict]
     ) -> tuple[str, int, str]:
+        """创建绑定申请人的三十分钟待处理申请。"""
         pending_id = "pending_" + uuid.uuid4().hex
         expires = (
-            datetime.now(timezone.utc) + timedelta(minutes=30)
+            datetime.now(UTC) + timedelta(minutes=30)
         ).isoformat(timespec="seconds")
         with closing(self._connect()) as db:
             db.execute(
@@ -152,16 +159,18 @@ class StateStore:
 
     @staticmethod
     def _validate_pending(row: sqlite3.Row, actor: Actor, revision: int) -> None:
+        """检查申请归属、版本、消费状态及过期时间。"""
         if row["actor_key"] != actor.key:
             raise StateError("DENIED")
         if row["used"] or row["revision"] != revision:
             raise StateError("STALE_PENDING")
-        if datetime.fromisoformat(row["expires_at"]) < datetime.now(timezone.utc):
+        if datetime.fromisoformat(row["expires_at"]) < datetime.now(UTC):
             raise StateError("EXPIRED")
 
     def consume_pending(
         self, actor: Actor, pending_id: str, revision: int
     ) -> tuple[dict, list[dict]]:
+        """在独立写事务中原子消费申请，防止并发重复执行。"""
         with closing(self._connect()) as db:
             try:
                 db.execute("BEGIN IMMEDIATE")
@@ -181,3 +190,13 @@ class StateStore:
             except Exception:
                 db.rollback()
                 raise
+
+    def release_pending(self, actor: Actor, pending_id: str, revision: int) -> None:
+        """仅在已消费操作尚未写入且校验失败时，恢复该持有人的申请。"""
+        with closing(self._connect()) as db:
+            db.execute(
+                """UPDATE pending_requests SET used = 0
+                WHERE pending_id = ? AND actor_key = ? AND revision = ? AND used = 1""",
+                (pending_id, actor.key, revision),
+            )
+            db.commit()

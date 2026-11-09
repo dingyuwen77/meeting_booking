@@ -1,16 +1,9 @@
-# meeting_booking 实施进度与设计决策
+# 实施路线图
 
-本目录仅保存**当前实现与尚需完成的外部联调**；历史阶段一设计资料在 [roadmap/archive/](archive/) 中，不再作为当前仓库已实现能力的依据。
+[roadmap/01_实施路线图与任务状态.md](01_实施路线图与任务状态.md) 是当前目标、设计决定、验收范围和剩余外部门禁的唯一入口。代码、命令与测试证据以实际文件及 PR 为准。
 
-## 当前交付范围
+- 理解当前服务、协议、操作和排障：[docs/README.md](../docs/README.md)。
+- 执行本地及真实环境验收：[docs/testing/01_测试与联调验收.md](../docs/testing/01_测试与联调验收.md)。
+- 查阅初始阶段一设计：[roadmap/archive/README.md](archive/README.md)。历史内容不参与当前状态判定。
 
-本仓库已新增：会畅 BizVideoProvider、MCP Server、企微 UserID 签名验证、标准化创建/修改/空闲检查、多轮 pending 及 SQLite 操作台账、Fake Provider 测试、部署样例和重新分类后的文档。
-
-**尚需取得新鲜验证证据：** 完整本地测试、Python MCP SDK v2 真正运行的 initialize/tools/list/tools/call、腾讯 ADP 结构化结果消费、真实企微用户身份传递、会畅测试站点创建/修改/冲突和并发/超时行为。没有这些证据不应称生产链路已上线。
-
-## 从哪里继续
-
-- [roadmap/01_实施路线图与任务状态.md](01_实施路线图与任务状态.md)：本次完整要求、设计取舍、验收矩阵和阶段状态。
-- [docs/README.md](../docs/README.md)：代码及文档的阅读路线。
-- [docs/testing/01_测试与联调验收.md](../docs/testing/01_测试与联调验收.md)：各层能证明什么、不能证明什么。
-- [roadmap/archive/00-current-state.md](archive/00-current-state.md)：初始阶段一历史盘点；原计划文件继续保留在 archive，不再被当成当前设计。
+仓库已具备本地可运行的 MCP、会畅适配代码、签名身份、SQLite 与多轮状态；真实会畅站点和 ADP/企微联调仍需环境与运行证据。代码合并不会自动启用生产写入或配置外部工作流。

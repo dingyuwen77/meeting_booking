@@ -18,6 +18,7 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        """读取并校验服务端环境配置，不自动加载本地密钥文件。"""
         raw_parties = os.getenv("MEETING_DEFAULT_PARTIES", "25")
         raw_timeout = os.getenv("MEETING_HTTP_TIMEOUT", "10")
         raw_url = os.getenv(
@@ -42,5 +43,6 @@ class Settings:
         )
 
     def require_provider(self) -> None:
+        """在供应商调用前要求站点和密钥均已配置。"""
         if not self.site_sign or not self.api_key:
             raise ValueError("缺少 MEETING_SITE_SIGN 或 MEETING_API_KEY")

@@ -28,7 +28,7 @@ Python 3.11+；新服务基于官方 Python MCP SDK **v2**，并依赖 jsonschem
 
 ```bash
 python -m venv .venv
-# Windows: .venv\\Scripts\\activate
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
 # Linux/macOS: source .venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m pytest -q
@@ -56,6 +56,8 @@ python -m meeting_reservation.mcp_server
 - 会畅 `roomId` 是虚拟会议资源标识；只有 `bizvideo-room:<roomId>` 可直连指定虚拟资源，文本 `A301` 被拒绝。
 
 真实权限、并发提交原子性、会畅连接稳定性和 ADP 身份透传仍需独立实测。部署注意事项与安全限制见 [docs/operations/02_部署与故障恢复.md](docs/operations/02_部署与故障恢复.md)。
+
+本地验收包含真实 MCP SDK 的 HTTP 工具调用、Schema 投影、SQLite 并发与恢复；验证方法见 [docs/testing/01_测试与联调验收.md](docs/testing/01_测试与联调验收.md)。远程 PR、提交及合并状态以 GitHub 为准，当前路线图只维护验收范围与剩余外部门禁。
 
 ## 开发限制
 

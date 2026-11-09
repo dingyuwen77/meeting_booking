@@ -3,7 +3,7 @@
 import hashlib
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .bizvideo import (
@@ -28,6 +28,7 @@ def result(
     conflicts: list[dict] | None = None, error_code: str | None = None,
     confirmed: dict | None = None,
 ) -> dict[str, Any]:
+    """构造业务结果并通过正式结果契约校验。"""
     value: dict[str, Any] = {
         "schema_version": "meeting.result.v1",
         "operation_id": op_id,
@@ -55,27 +56,31 @@ def result(
 
 
 def _fingerprint(payload: Any) -> str:
+    """计算稳定请求摘要，阻止同操作号被用于不同请求。"""
     text = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _date(value: str) -> datetime:
+    """解析带偏移的业务时间并统一为 UTC 瞬时。"""
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
         raise ValueError("时间缺失时区")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _interval(start: datetime, end: datetime) -> int:
+    """要求未来开始时间与正整数分钟时长。"""
     span = (end - start).total_seconds()
     if span <= 0 or span % 60 != 0:
         raise ValueError("会议时长必须是正整数分钟")
-    if start <= datetime.now(timezone.utc):
+    if start <= datetime.now(UTC):
         raise ValueError("会议开始时间必须在未来")
     return int(span // 60)
 
 
 def _overlap(first: datetime, second: datetime, start: datetime, end: datetime) -> bool:
+    """按半开时间区间判断会议是否重叠。"""
     return first < end and start < second
 
 
@@ -84,6 +89,7 @@ class MeetingService:
         self, settings: Settings, store: StateStore,
         provider: BizVideoProvider,
     ):
+        """初始化本模块所需的状态与依赖。"""
         self.settings = settings
         self.store = store
         self.provider = provider
@@ -93,6 +99,7 @@ class MeetingService:
         message: str, *, options: list[dict] | None = None,
         conflicts: list[dict] | None = None,
     ) -> dict:
+        """持久化原申请和候选，仅向调用方公开必要选项。"""
         internal = options or []
         pending_id, revision, expires = self.store.create_pending(
             actor, intent, internal
@@ -108,30 +115,43 @@ class MeetingService:
         )
 
     def _complete(self, actor: Actor, op_id: str, conf_id: int) -> dict:
+        """写后回读并核对会议身份；本阶段失败只能进入 UNKNOWN。"""
         # 创建/修改写入后回读权威详情，避免从原始 LLM 输入宣布结果。
-        meeting = self.provider.detail(actor, conf_id)
-        if str(meeting.get("userId", "")) != actor.user_id:
-            raise ProviderUnknown("会畅已返回成功，但回读用户身份不匹配")
         try:
+            meeting = self.provider.detail(actor, conf_id)
+            if (
+                str(meeting.get("userId", "")) != actor.user_id
+                or str(meeting.get("confId", "")) != str(conf_id)
+            ):
+                raise ProviderUnknown("会畅写后回读的用户或会议 ID 不匹配")
+            number = meeting["confNumber"]
+            duration = meeting["duration"]
+            if (
+                isinstance(number, bool) or not isinstance(number, (str, int))
+                or isinstance(duration, bool) or not str(duration).isdecimal()
+            ):
+                raise ValueError("会议号或时长缺少有效值")
             confirmed = {
                 "meeting_id": str(meeting["confId"]),
-                "meeting_number": str(meeting["confNumber"]),
-                "title": str(meeting["confName"]),
+                "meeting_number": str(number),
+                "title": meeting["confName"],
                 "start_at": parse_provider_time(str(meeting["startTime"])).isoformat(),
-                "duration_minutes": int(meeting["duration"]),
-                "join_url": str(meeting["joinUrl"]),
+                "duration_minutes": int(duration),
+                "join_url": meeting["joinUrl"],
             }
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ProviderUnknown("会畅写入后返回的会议详情不完整") from exc
-        return result(
-            op_id, "COMMITTED", "会畅已确认会议操作成功",
-            meeting_id=str(conf_id), confirmed=confirmed,
-        )
+            return result(
+                op_id, "COMMITTED", "会畅已确认会议操作成功",
+                meeting_id=str(conf_id), confirmed=confirmed,
+            )
+        except (ProviderError, KeyError, TypeError, ValueError) as exc:
+            # ValueError 包含结果契约校验错误，不能将已写入误报为 INVALID。
+            raise ProviderUnknown("会畅写后详情无法确认，需核实原操作") from exc
 
     def _user_conflict(
         self, actor: Actor, start: datetime, end: datetime,
         exclude_id: str | None = None,
     ) -> bool:
+        """检查当前用户其他预约与目标时段的交集。"""
         for item in self.provider.scheduled(actor):
             try:
                 if exclude_id is not None and str(item.get("confId")) == exclude_id:
@@ -148,6 +168,7 @@ class MeetingService:
 
     @staticmethod
     def _room_id(query: str | None) -> int | None:
+        """仅解析明确的会畅虚拟资源标识，拒绝实体会议室文本。"""
         if query is None:
             return None
         match = _ROOM.fullmatch(query)
@@ -161,6 +182,7 @@ class MeetingService:
         self, actor: Actor, room_id: int, start: datetime, end: datetime,
         parties: int, exclude_id: str | None = None,
     ) -> bool:
+        """检查指定虚拟资源容量及排除原会议后的占用。"""
         for room in self.provider.rooms(actor):
             if str(room.get("roomId")) != str(room_id):
                 continue
@@ -179,6 +201,7 @@ class MeetingService:
     def _pool_available(
         self, actor: Actor, start: datetime, minutes: int, parties: int
     ) -> bool:
+        """按受控容量检查会畅资源池，拒绝损坏响应。"""
         pools = self.provider.availability(actor, start, minutes)
         try:
             return any(
@@ -191,6 +214,7 @@ class MeetingService:
     def _meeting_parameters(
         self, meeting: dict, require_title: bool,
     ) -> tuple[str, datetime, datetime, int] | dict:
+        """检查必要字段与能力限制并计算可执行的会议参数。"""
         required = ("title", "start_at", "end_at") if require_title else (
             "start_at", "end_at"
         )
@@ -211,6 +235,7 @@ class MeetingService:
     def _create_or_check(
         self, actor: Actor, op_id: str, intent: dict,
     ) -> dict:
+        """执行预约前检查；CHECK 只读，CREATE 受写开关限制。"""
         meeting = intent["meeting"]
         params = self._meeting_parameters(
             meeting, require_title=intent["action"] == "CREATE"
@@ -270,6 +295,7 @@ class MeetingService:
     def _resolve_target(
         self, actor: Actor, op_id: str, intent: dict
     ) -> str | dict:
+        """定位本人会议；多候选时要求用户明确选择。"""
         target = intent.get("target")
         if not target:
             return self._pending(
@@ -317,6 +343,7 @@ class MeetingService:
         return str(matches[0]["confId"])
 
     def _update(self, actor: Actor, op_id: str, intent: dict) -> dict:
+        """读取原会议、检查所有权并按差量更新同一会议。"""
         resolved = self._resolve_target(actor, op_id, intent)
         if isinstance(resolved, dict):
             return resolved
@@ -407,6 +434,7 @@ class MeetingService:
         return self._complete(actor, op_id, int(updated["confId"]))
 
     def _execute(self, actor: Actor, op_id: str, intent: dict) -> dict:
+        """按已校验意图分发创建、修改与空闲查询。"""
         action = intent["action"]
         if action in ("CREATE", "CHECK"):
             return self._create_or_check(actor, op_id, intent)
@@ -420,6 +448,7 @@ class MeetingService:
     def _run(
         self, actor: Actor, op_id: str, payload: dict, execute: Any,
     ) -> dict:
+        """持久化占用操作号并保存结果，不自动重放未知写入。"""
         try:
             previous = self.store.begin(actor, op_id, _fingerprint(payload))
         except StateError as exc:
@@ -457,6 +486,7 @@ class MeetingService:
         return outcome
 
     def submit(self, actor: Actor, request: dict) -> dict:
+        """校验正式提交契约后进入幂等业务入口。"""
         validate_payload("request", request)
         op_id = request["operation_id"]
         return self._run(
@@ -465,11 +495,10 @@ class MeetingService:
         )
 
     def continue_request(self, actor: Actor, request: dict) -> dict:
+        """验证申请持有人与版本，再处理补参、选择或取消。"""
         validate_payload("continue", request)
         op_id = request["operation_id"]
-        # A foreign or stale pending request must not reserve an operation_id.
-        # Already-recorded calls skip this precheck so an idempotent retry can
-        # recover its original result after the pending entry was consumed.
+        # 他人或失效申请不能抢占操作号；已记录操作仍可恢复消费前的原结果。
         try:
             existing = self.store.operation(actor, op_id)
             if existing is None:
@@ -488,6 +517,7 @@ class MeetingService:
             )
 
         def run() -> dict:
+            """合并用户决策并消费申请，校验失败时恢复可纠正状态。"""
             intent, options = self.store.read_pending(
                 actor, request["pending_request_id"], request["expected_revision"]
             )
@@ -530,9 +560,18 @@ class MeetingService:
             self.store.consume_pending(
                 actor, request["pending_request_id"], request["expected_revision"]
             )
-            return self._execute(actor, op_id, intent)
+            try:
+                return self._execute(actor, op_id, intent)
+            except ValueError:
+                # 输入尚未触发写入即被业务校验拒绝，允许原持有人纠正补参。
+                # 写后解析/校验失败由 ProviderUnknown 隔离，不能在此释放申请。
+                self.store.release_pending(
+                    actor, request["pending_request_id"], request["expected_revision"]
+                )
+                raise
 
         def execute() -> dict:
+            """将申请状态冲突转换为明确业务结果。"""
             try:
                 return run()
             except StateError as exc:
@@ -549,6 +588,7 @@ class MeetingService:
         return self._run(actor, op_id, request, execute)
 
     def get_operation(self, actor: Actor, request: dict) -> dict:
+        """仅返回本人已存操作状态，不触发供应商写入。"""
         validate_payload("operation-query", request)
         op_id = request["operation_id"]
         try:

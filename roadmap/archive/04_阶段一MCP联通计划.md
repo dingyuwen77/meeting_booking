@@ -52,7 +52,7 @@ JSON Schema 在 Python 中能通过测试，并不保证 ADP 能发现工具、�
   └─ 否：输出测试失败（不要吞掉错误）
 ~~~
 
-本阶段**不使用大模型替代身份验证**，也不接真实会议 API，不依赖完整多轮流程。后续正式画布见 [roadmap/05-adp-wecom-workflow.md](05-adp-wecom-workflow.md)。
+本阶段**不使用大模型替代身份验证**，也不接真实会议 API，不依赖完整多轮流程。后续正式画布见 [roadmap/archive/06_阶段一ADP与企微计划.md](06_阶段一ADP与企微计划.md)。
 
 ## 5. 什么时候算 PoC 通过
 
@@ -60,6 +60,6 @@ JSON Schema 在 Python 中能通过测试，并不保证 ADP 能发现工具、�
 - 能在 ADP 的下游节点取到期望的结构化字段，而不只是整段文本。
 - 认证和网络边界明确；最终用户身份方案具备可验证的链路证据或标记未通过。
 - stable operation_id 的生成、重试及跨轮查回方案已确定，不是假设平台自动提供。
-- 记录平台实际版本与发现的限制，并反馈 [roadmap/02-contract-and-decisions.md](02-contract-and-decisions.md) 的契约冻结门禁。
+- 记录平台实际版本与发现的限制，并反馈 [roadmap/archive/03_阶段一契约与决策.md](03_阶段一契约与决策.md) 的契约冻结门禁。
 
 **未通过如何处理：** 仅阻塞依赖该能力的后续操作；可以继续本地 Schema/业务 Fake 测试，但不能声称已完成 ADP 对接或开启真实会议写入。

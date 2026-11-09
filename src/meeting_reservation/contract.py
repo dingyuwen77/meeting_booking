@@ -50,6 +50,34 @@ def get_schema(kind: str) -> dict[str, Any]:
     return deepcopy(_schemas()[kind])
 
 
+def get_inline_schema(kind: str) -> dict[str, Any]:
+    """从同一机器契约展开引用，供无法解析包内 URN 的 MCP 消费者使用。"""
+    schema = get_schema(kind)
+    by_id = {item["$id"]: item for item in _schemas().values()}
+
+    def expand(value: Any, document: dict) -> Any:
+        """仅展开本包已知的非递归 Schema，不读取网络或维护第二份字段定义。"""
+        if isinstance(value, list):
+            return [expand(item, document) for item in value]
+        if not isinstance(value, dict):
+            return value
+        if "$ref" in value:
+            identity, _, pointer = value["$ref"].partition("#")
+            target_doc = by_id[identity] if identity else document
+            target: Any = target_doc
+            for part in pointer.split("/")[1:]:
+                target = target[part.replace("~1", "/").replace("~0", "~")]
+            resolved = expand(target, target_doc)
+            siblings = {key: item for key, item in value.items() if key != "$ref"}
+            return {"allOf": [resolved, expand(siblings, document)]} if siblings else resolved
+        return {
+            key: expand(item, document) for key, item in value.items()
+            if key not in {"$id", "$schema", "$defs"}
+        }
+
+    return expand(schema, schema)
+
+
 def _check_time_order(start_at: str | None, end_at: str | None, path: str) -> None:
     """同时知道起止时间时按实际时区比较，不能只比较字符串。"""
     if start_at is None or end_at is None:

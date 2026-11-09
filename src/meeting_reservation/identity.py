@@ -6,8 +6,8 @@ import hmac
 import json
 import re
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from .settings import Settings
 
@@ -26,6 +26,7 @@ class Actor:
 
     @property
     def key(self) -> str:
+        """组合企业与成员标识，作为本地台账的隔离键。"""
         return f"{self.corp_id}:{self.user_id}"
 
 

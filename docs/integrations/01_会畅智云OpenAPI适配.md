@@ -4,6 +4,8 @@
 
 Provider 依据用户提供的《会畅智云账号模式 Open API》**v1.0.10（2026-03-27）**实现，不是另一套公共业务协议。正式使用前必须向会畅申请站点、开通 OpenAPI 权限，获得 `siteSign`、`APIKey` 并使用隔离测试账号测试；当前仓库没有这些凭据。
 
+原 PDF 未入库；本轮续接未取得可重新读取的附件，因此这里记录的是前次实现的资料版本和映射依据。HTTP Mock 只能证明本代码发出了什么，端点章节、响应字段及租户权限仍需用原文与真实测试站点复核。
+
 ## Token 与网络格式
 
 每次请求使用 `token = MD5("UserId|APIKey|timeStamp").upper()`，`timeStamp` 为毫秒级时间戳；`UserId` 直接取已验签企业微信 UserID。会畅传入/返回的时间按 **GMT/UTC** 处理；POST 用 `application/x-www-form-urlencoded`，GET 用 Query，不是 JSON POST。真实结果需以 `status == 100` 为成功依据，HTTP 200 不能替代业务状态。实现见 [src/meeting_reservation/bizvideo.py](../../src/meeting_reservation/bizvideo.py)。
@@ -33,5 +35,7 @@ Provider 依据用户提供的《会畅智云账号模式 Open API》**v1.0.10�
 ## 错误与部分失败
 
 会畅 `100` 成功、`202` 时间冲突、`205` 无资源、`401` 会议不存在或无归属、`102` Token/权限失败。具体错误含义以原 PDF 为准。网络超时、远端已经成功但丢失响应、回读缺失必要详情时必须进入 `UNKNOWN`，不能重新调用创建 API。
+
+写响应缺少业务状态、会议号格式损坏、修改响应指向其他会议，以及写后回读网络失败、归属/会议号错配或结果字段不合法，也进入 `UNKNOWN`。Provider 的连接由 MCP 生命周期释放；外部注入测试连接由测试调用方关闭。
 
 **尚未确认的服务端事实：** 提交原子性、第三方幂等键、供应商是否允许乐观版本更新、不同模式下可选字段语义。这些必须经测试 API 验证，不能由 Fake 或静态 PDF 文档推导为已成立。

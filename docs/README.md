@@ -14,6 +14,8 @@
 | 8 | 环境、密钥、单机持久化和回滚 | [docs/operations/02_部署与故障恢复.md](operations/02_部署与故障恢复.md) |
 | 9 | Fake/契约/Provider/ADP/企微分层验收 | [docs/testing/01_测试与联调验收.md](testing/01_测试与联调验收.md) |
 
-历史： [docs/archive/01_阶段一契约验收记录.md](archive/01_阶段一契约验收记录.md)、[roadmap/README.md](../roadmap/README.md)。
+历史记录：[docs/archive/01_阶段一契约验收记录.md](archive/01_阶段一契约验收记录.md)、[docs/archive/02_阶段一协议候选快照.md](archive/02_阶段一协议候选快照.md)。初始路线图归档导航：[roadmap/archive/README.md](../roadmap/archive/README.md)；当前任务与外部门禁：[roadmap/01_实施路线图与任务状态.md](../roadmap/01_实施路线图与任务状态.md)。
 
 **事实分层：** 当前功能应从源码和测试确认；字段机器契约只以 [src/meeting_reservation/schemas/](../src/meeting_reservation/schemas/) 为准；会畅真实能力以供应商文档与实际测试为准。未实测的外部能力不能因本地 Fake 测试通过而标为已完成。
+
+维护分工：本目录解释当前系统；机器字段以 Schema 为准；路线图维护验收状态；PR 记录对应 revision 的施工、测试与合并证据。原 docs/CONTRACT.md 与 docs/PHASE1.md 仅保留兼容导航。
