@@ -1,0 +1,22 @@
+{
+  "schema_version": "meeting.request.v1",
+  "operation_id": "op_demo_create_001",
+  "intent": {
+    "schema_version": "meeting.intent.v1",
+    "action": "CREATE",
+    "target": null,
+    "meeting": {
+      "title": "产品评审会",
+      "start_at": "2026-11-05T14:00:00+08:00",
+      "end_at": "2026-11-05T15:00:00+08:00",
+      "timezone": "Asia/Shanghai",
+      "room_query": "A301",
+      "attendee_queries": [
+        "张三",
+        "李四"
+      ],
+      "description": null
+    },
+    "update": null
+  }
+}

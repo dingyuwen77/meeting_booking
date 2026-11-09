@@ -1,0 +1,27 @@
+{
+  "schema_version": "meeting.result.v1",
+  "operation_id": "op_demo_create_001",
+  "status": "CONFLICT",
+  "meeting_id": null,
+  "pending_request_id": "pending_demo_001",
+  "pending_revision": 1,
+  "expires_at": "2026-11-05T13:50:00+08:00",
+  "message": "A301 在指定时段被占用",
+  "conflicts": [
+    {
+      "type": "ROOM",
+      "resource_label": "A301"
+    }
+  ],
+  "options": [
+    {
+      "option_id": "opt_1",
+      "label": "改到15:00-16:00"
+    },
+    {
+      "option_id": "opt_2",
+      "label": "换到A302"
+    }
+  ],
+  "error": null
+}

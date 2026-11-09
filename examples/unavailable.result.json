@@ -1,0 +1,18 @@
+{
+  "schema_version": "meeting.result.v1",
+  "operation_id": "op_demo_create_001",
+  "status": "UNAVAILABLE",
+  "meeting_id": null,
+  "pending_request_id": null,
+  "pending_revision": null,
+  "expires_at": null,
+  "message": "A301 在该时间段不可用",
+  "conflicts": [
+    {
+      "type": "ROOM",
+      "resource_label": "A301"
+    }
+  ],
+  "options": [],
+  "error": null
+}

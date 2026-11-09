@@ -1,0 +1,79 @@
+# 07｜逐项开发清单与阶段交接（进度唯一入口）
+
+> 用法：每完成一行，先复核对应代码/运行结果，再把本表状态由“未实现/待确认”改成“已验证”；写清测试证据、环境和版本。**当前除阶段一基础外，全部是计划，不是已交付结果。**
+
+## 1. 进度定义
+
+- **已验证：** 当前真实文件/配置与目标行为对应，已取得相称的新鲜 Evidence。
+- **已实现待验证：** 有对应代码/配置，但缺测试或真实外部证据。
+- **待确认：** 上游业务决定或 Provider/ADP 能力尚未验证；不能假定成功。
+- **未实现：** 尚无对应代码/工作流/集成。
+- **阻塞：** 缺失必需前置，无法安全继续该阶段；不影响与其无依赖的本地开发。
+
+## 2. 任务表（按真实依赖排序）
+
+| ID | 任务/交付件 | 依赖 | 状态（本轮） | 最小完成证据 |
+|---|---|---|---|---|
+| T00 | 当前 Python 契约、CLI、测试现状复核 | 无 | **已验证（仅阶段一）** | 67 passed、ruff 通过、18 示例通过；见 [roadmap/00-current-state.md](00-current-state.md) |
+| T01 | 获取权威会议系统 API/资源/权限/版本/原子预订事实 | 外部业务系统负责人 | **待确认** | 可核验的 API/测试环境与正反例；B01/B03/B09 有结论 |
+| T02 | 冻结会议冲突、补参、通知、时区和默认行为的业务要求 | T01 + 业务 Owner | **待确认** | B02/B04/B05/B07/B08 有结论及测试样例 |
+| T03 | 修订候选契约：NEED_INPUT 补字段、自由文本修订及 pending 版本 | T01/T02 | **未实现** | C01/C02 对应 Schema+测试+样例通过 |
+| T04 | 补齐真实提交详情、stable operation_id 的调用方语义与结果查询规则 | T01/T03 | **未实现** | C03/C04 行为有端到端定义和契约测试 |
+| T05 | 最小 MCP Server：ping、initialize、tools/list、tools/call | T00；可与 T01/T02 并行 | **未实现** | Inspector/测试 Client 实际调用 |
+| T06 | ADP 连通、工具 Schema/$ref 和响应映射 PoC | T05 | **未实现** | ADP 实际工具调用/失败分支证据 |
+| T07 | 可信最终用户身份探针与认证/授权路径 | T05 + 企微测试账号/渠道 | **未实现** | 两用户身份区分、冒用拒绝、权限来源明确 |
+| T08 | 稳定业务操作 ID 生成/复用 + 待处理申请查询的跨轮关联 | T04/T06/T07 | **未实现** | 重试同 ID；下一轮可恢复原 pending；不同用户不可交叉 |
+| T09 | 真实会议系统适配器：查询/解析/创建/修改/回读 | T01/T03/T04 + 测试凭据 | **未实现** | Provider 沙箱创建和修改真实可查 |
+| T10 | MCP 领域逻辑：冲突判定、修改差量、版本校验、业务错误 | T09 + T02 | **未实现** | Fake + Provider 的正反例 |
+| T11 | pending 状态机、持久化、选择/补参/取消/过期 | T03/T08/T10 | **未实现** | 重启后恢复、revision 校验、过期和跨用户拒绝 |
+| T12 | 写入幂等、UNKNOWN 对账、真实并发保护 | T08/T09/T10 | **未实现** | AC12–AC14、AC18、AC20 的相称证据 |
+| T13 | 三个正式 MCP Tool 的契约与实际集成 | T10/T11/T12 + T06 | **未实现** | 完整工具输入输出及真实业务测试 |
+| T14 | ADP 单工作流：提取/校验/工具/状态/待处理回复 | T03/T04/T08/T13 | **未实现** | 所有 status 路由及多轮 Fake/真实 MCP 联调 |
+| T15 | 企业微信单聊（必要时群聊）端到端验证 | T07/T14 | **未实现** | 真实用户建立/改会、冲突选择和隔离 |
+| T16 | 综合验收、安全审查、配置/部署/回退文档 | T12/T15 | **未实现** | AC01–AC20 适用项证据、受控发布门禁 |
+
+**并行原则：** T05 的只读基础 MCP 可以不等待会议 Provider；T01/T02 尚未闭合不影响 Schema 基础验证；但 T09–T13 依赖真实 Provider 语义，T14–T15 不能代替 T09–T13 的业务正确性验证。
+
+## 3. 每次开发从哪里改代码
+
+**契约增强（T03/T04）：** 优先从 [docs/CONTRACT.md](../docs/CONTRACT.md) 判断现有契约语义；更新 [src/meeting_reservation/schemas/meeting-continue.v1.schema.json](../src/meeting_reservation/schemas/meeting-continue.v1.schema.json)、[src/meeting_reservation/schemas/meeting-result.v1.schema.json](../src/meeting_reservation/schemas/meeting-result.v1.schema.json)（确实需要才改），复用 [src/meeting_reservation/contract.py](../src/meeting_reservation/contract.py) 与 [tests/test_contracts.py](../tests/test_contracts.py)。若改 UPDATE 相关语义，还需同步 [tests/test_unified_update.py](../tests/test_unified_update.py)。
+
+**MCP 新业务代码（T05–T13）：** 当前目录没有 MCP 生产文件、Provider adapter、持久化实现、认证中间件。后续按**真实 SDK、Provider 和项目结构**选择模块及目录，不在 roadmap 创建无事实根据的“必须存在路径”。代码变更需相应新增测试与运行说明，避免只有一份脱离实现的文档。
+
+**ADP/企微配置（T14/T15）：** 保存经验证的实际工作流版本/导出、工具映射、身份验收、测试记录。不要在本地自称已部署而没有可核验的平台产物。
+
+## 4. 下一任务推荐顺序
+
+**现在优先 T01/T02，而不是直接 T14：** 请会议系统负责人提供 API 文档、测试环境、会议/会议室/用户 ID 口径、权限和并发保障。与此同时可以并行做 T05 的最小无业务副作用 MCP 连通测试。
+
+**随后做 T03/T04：** 重点先修补“用户缺少时间→补时→继续原订单”的契约闭环；确认最终 COMMITTED 回执从哪里读真实时间地点；决定操作 ID 在企微/ADP 多轮中如何稳定。
+
+**再做 T06/T07/T08：** 用实际 ADP 和企微测试账户证明工具结构与身份可用，并确定 pending 的跨轮定位办法。若身份无法可信建立，暂时只开放无敏感信息的查询，不做生产会议写入。
+
+**最后做 T09–T16：** 独立 MCP 真业务 → ADP 画布 → 企微联调 → 系统性验收与受控交付。
+
+## 5. 单项任务完成记录（每次复制一小段到对应任务下）
+
+~~~text
+任务 ID：
+实现版本/环境：
+实际变更（列已存在的仓库文件/平台配置）：
+对应 Requirement/业务决策：
+验证命令或真实操作：
+结果（pass/fail/skipped，实际数字与返回状态）：
+证明范围（Unit / Contract / Provider / ADP / 企微）：
+未验证边界或剩余风险：
+Docs/Schema/消费者是否同步：
+Git/PR/CI/发布状态（没有则明确无）：
+下一任务依赖：
+~~~
+
+不要新增与之并行的第二套 Change/Evidence 管理数据库。若未来项目有自己的 AGENTS、Change 或 PR 治理规则，以正式规则为准，不用本表绕过质量门禁。
+
+## 6. 研发过程应遵守的约束
+
+每次真正改代码前：先读取目标目录/上级项目规则与本任务真实源码/Contract；再通过当前 canonical 的 dingyuwen77/Agent_Skills 根 AGENTS.md → ENTRY → Router 加载 Coding、Testing、Docs 及实际命中的 references。根据风险建立目标/非目标、Acceptance、Contract/安全边界、验证矩阵；新的可观察行为通常先写失败测试再改实现。仅在用户授权下执行 Git、PR、部署、生产写入；不擅自新增 Agent_Skills 安装副本或覆盖用户修改。
+
+若未来项目初始化 Git，按当时正式仓库与项目约定决定分支/PR/CI；当前项目不是 Git 仓库，不能声称本轮已提交或已合并。
+
+项目目标架构见 [roadmap/01-product-and-boundaries.md](01-product-and-boundaries.md)；验收定义见 [roadmap/06-test-and-release.md](06-test-and-release.md)。

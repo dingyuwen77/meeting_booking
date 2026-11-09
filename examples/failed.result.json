@@ -1,0 +1,17 @@
+{
+  "schema_version": "meeting.result.v1",
+  "operation_id": "op_demo_create_001",
+  "status": "FAILED",
+  "meeting_id": null,
+  "pending_request_id": null,
+  "pending_revision": null,
+  "expires_at": null,
+  "message": "会议写入失败",
+  "conflicts": [],
+  "options": [],
+  "error": {
+    "code": "MEETING_WRITE_FAILED",
+    "message": "会议系统拒绝写入",
+    "retryable": false
+  }
+}

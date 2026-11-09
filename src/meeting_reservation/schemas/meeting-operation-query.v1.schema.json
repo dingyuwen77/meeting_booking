@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adp-meeting:contract:meeting-operation-query:v1",
+  "title": "MCP 查询操作状态 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "meeting.operation-query.v1"
+    },
+    "operation_id": {
+      "type": "string",
+      "pattern": "^op_[A-Za-z0-9_-]{8,96}$"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": "meeting.continue.v1",
+  "operation_id": "op_demo_continue_001",
+  "pending_request_id": "pending_demo_001",
+  "expected_revision": 1,
+  "decision": {
+    "kind": "SELECT_OPTION",
+    "option_id": "opt_2"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adp-meeting:contract:meeting-continue:v1",
+  "title": "MCP 继续处理待决策申请 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id",
+    "pending_request_id",
+    "expected_revision",
+    "decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "meeting.continue.v1"
+    },
+    "operation_id": {
+      "type": "string",
+      "pattern": "^op_[A-Za-z0-9_-]{8,96}$"
+    },
+    "pending_request_id": {
+      "type": "string",
+      "pattern": "^pending_[A-Za-z0-9_-]{4,96}$"
+    },
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "decision": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "option_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "SELECT_OPTION"
+            },
+            "option_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "CANCEL"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

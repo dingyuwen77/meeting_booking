@@ -1,0 +1,13 @@
+{
+  "schema_version": "meeting.result.v1",
+  "operation_id": "op_demo_create_001",
+  "status": "NEED_INPUT",
+  "meeting_id": null,
+  "pending_request_id": "pending_demo_001",
+  "pending_revision": 1,
+  "expires_at": "2026-11-05T13:50:00+08:00",
+  "message": "请补充会议结束时间",
+  "conflicts": [],
+  "options": [],
+  "error": null
+}

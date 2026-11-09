@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:adp-meeting:contract:meeting-intent:v1",
+  "title": "ADP 会议语义意图 V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "action",
+    "target",
+    "meeting",
+    "update"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "meeting.intent.v1"
+    },
+    "action": {
+      "enum": [
+        "CREATE",
+        "UPDATE",
+        "CHECK",
+        "OTHER"
+      ]
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/target"
+        }
+      ]
+    },
+    "meeting": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/meeting"
+        }
+      ]
+    },
+    "update": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/update"
+        }
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "action": {
+          "const": "CREATE"
+        },
+        "target": {
+          "type": "null"
+        },
+        "meeting": {
+          "$ref": "#/$defs/meeting"
+        },
+        "update": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "const": "CHECK"
+        },
+        "target": {
+          "type": "null"
+        },
+        "meeting": {
+          "$ref": "#/$defs/meeting"
+        },
+        "update": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "const": "UPDATE"
+        },
+        "meeting": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "const": "OTHER"
+        },
+        "target": {
+          "type": "null"
+        },
+        "meeting": {
+          "type": "null"
+        },
+        "update": {
+          "type": "null"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "meeting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "start_at",
+        "end_at",
+        "timezone",
+        "room_query",
+        "attendee_queries"
+      ],
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "start_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?[+-](?:0\\d|1[0-4]):[0-5]\\d$"
+        },
+        "end_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?[+-](?:0\\d|1[0-4]):[0-5]\\d$"
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "room_query": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "attendee_queries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meeting_id",
+        "search_text"
+      ],
+      "properties": {
+        "meeting_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "search_text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "meeting_id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "properties": {
+            "search_text": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "update": {
+      "type": "object",
+      "description": "统一的会议修改意图：time_shift_minutes 对整场会议平移，changes 只改明确字段；两种意图可组合但不能同时指定绝对和相对时间。",
+      "additionalProperties": false,
+      "required": [
+        "time_shift_minutes",
+        "changes"
+      ],
+      "properties": {
+        "time_shift_minutes": {
+          "description": "null 表示无相对平移；非零整数表示整体平移的分钟数，正数推迟、负数提前。与 changes 内 start_at/end_at 互斥。",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "not": {
+            "const": 0
+          }
+        },
+        "changes": {
+          "type": "object",
+          "description": "未出现字段保持原样；attendee_queries 出现时表示完整替换名单；description:null 表示清空描述。",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "start_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?[+-](?:0\\d|1[0-4]):[0-5]\\d$"
+            },
+            "end_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?[+-](?:0\\d|1[0-4]):[0-5]\\d$"
+            },
+            "room_query": {
+              "type": "string",
+              "minLength": 1
+            },
+            "attendee_queries": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "time_shift_minutes": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "time_shift_minutes"
+            ]
+          },
+          "then": {
+            "properties": {
+              "changes": {
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "time_shift_minutes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "time_shift_minutes"
+            ]
+          },
+          "then": {
+            "properties": {
+              "changes": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "start_at"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "end_at"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "meeting.request.v1",
+  "operation_id": "op_example_update_001",
+  "intent": {
+    "schema_version": "meeting.intent.v1",
+    "action": "UPDATE",
+    "target": {
+      "meeting_id": null,
+      "search_text": "明天的产品评审会"
+    },
+    "meeting": null,
+    "update": {
+      "time_shift_minutes": 60,
+      "changes": {
+        "room_query": "A302"
+      }
+    }
+  }
+}

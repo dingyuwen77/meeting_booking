@@ -1,0 +1,90 @@
+# 06｜测试矩阵、验收证据与受控交付
+
+> 这里是**将来要执行的验收计划**，不代表测试已经运行。当前仅阶段一契约测试有新鲜证据，见 [roadmap/00-current-state.md](00-current-state.md)。
+
+## 1. 先区分每层测试能证明什么
+
+| 测试层 | 本项目中要证明的内容 | 不能代替什么 |
+|---|---|---|
+| 单元/Schema | 时间顺序、字段枚举、UPDATE 差量、返回状态、错误条件 | 真会议系统可用 |
+| MCP 契约/协议 | initialize/tools/list/tools/call、入参/返回结构、SDK/ADP 兼容 | 创建/修改真实副作用 |
+| Fake 业务集成 | 权限规则、状态机、冲突候选、错误恢复、幂等逻辑 | 真 Provider 的事务与授权 |
+| 真实会议系统沙箱集成 | 查询、创建、修改、提交时冲突保护、真实回读 | 企业微信入口 |
+| ADP 工作流 | 意图识别、节点变量映射、状态分支、待决策关联 | 后端持久化正确 |
+| 企微 E2E | 真实用户消息 → ADP → MCP → 沙箱会议 → 可见结果 | 全部异常/并发边界 |
+
+**只用 Python 单测绿色不能声明会议系统可交付。** 也不能用一次企微正常建会证明并发、幂等、越权都已覆盖。
+
+## 2. 核心用户场景验收（V1）
+
+| AC | 场景与前置 | 预期可观察结果 | 最小证据层 |
+|---|---|---|---|
+| AC01 | 用户明确 CREATE，字段完整且会议室空闲 | 仅创建一场、返回真实 meeting_id | 会议沙箱 + 企微 E2E |
+| AC02 | 用户仅询问会议室空闲 CHECK | 返回可用/不可用，不产生新会议 | MCP 集成 |
+| AC03 | 缺少结束时间的 CREATE | NEED_INPUT，用户补时后能沿同一申请继续 | Contract + Fake + ADP |
+| AC04 | 会议室存在冲突 | 不创建，返回 CONFLICT 和真实候选或无选项 | Fake + 会议沙箱 |
+| AC05 | 用户选定候选会议室/时间 | 再次检查资源后成功或返回新冲突 | Fake + 会议沙箱 + ADP |
+| AC06 | 用户拒绝候选并提出新时间/会议室 | 按已确定修订路径处理，绝不伪装 option_id | Contract + ADP |
+| AC07 | UPDATE 命中唯一会议 | 修改原会议，不创建第二条 | 会议沙箱 |
+| AC08 | UPDATE 相对平移和换会议室组合 | 持续时长保持，未出现字段不改变 | Unit + 会议沙箱 |
+| AC09 | UPDATE 匹配多场会议 | NEED_SELECTION，不猜测目标 | Fake + ADP |
+| AC10 | 用户修改无权限会议 | DENIED，原会议不变且不泄漏详情 | 真实权限测试 |
+| AC11 | 重名参会者、模糊会议室 | 先解析/确认唯一 ID，不能猜错 | Fake + Provider |
+| AC12 | 同一操作被重复提交 | 不产生第二场会议 | 持久幂等集成 |
+| AC13 | 两名用户同时抢订一个时间段 | 最多一个提交成功，无重叠占用 | 受控并发 Provider 集成 |
+| AC14 | 创建成功后连接超时 | IN_PROGRESS/UNKNOWN 后可查回原结果，不能盲重建 | 故障注入 + 沙箱 |
+| AC15 | pending 过期或旧 revision 继续 | 拒绝或重新核对，不使用旧选项 | 持久状态测试 |
+| AC16 | 不同企微用户回复同一 pending | 非持有人不能继续或取消 | 身份/权限 + 企微 |
+| AC17 | CHECK/OTHER 尝试触发写工具 | 拦截，无会议写副作用 | Contract/集成 |
+| AC18 | UPDATE 提交时原会议被并发修改 | 版本冲突被检测，不覆盖新数据 | 会议沙箱 |
+| AC19 | ADP 生成非法 JSON 或时间倒置 | 权威校验拒绝，不写入会议 | Schema + ADP |
+| AC20 | MCP/Provider 服务重启或暂时故障 | pending/operation 可恢复或明确未恢复风险 | 持久化集成 |
+
+AC03 和 AC06 依赖 [roadmap/02-contract-and-decisions.md](02-contract-and-decisions.md) 的补参/修订方案；未确定前不能强行标记“通过”。
+
+## 3. 各阶段验收门禁
+
+**G0/G1：**
+- 完整会议系统事实、身份/权限与冲突规则已经定义；五种 Schema 与示例合法、错误行为明确。
+- 允许的 UPDATE 语义、C01/C02 多轮补参与 C03 已提交详情得到一致的业务答案。
+- 双方确认 V1 冻结范围；尚未接入前只能叫候选。
+
+**G2：**
+- MCP 协议握手、工具发现和调用成功；ADP 能读取结构化状态；只读身份探针和稳定 ID 方案可验证。
+- 如果身份不可信，不得进入真实写入测试。
+
+**G3：**
+- 在独立 Client + 真实会议沙箱中完成创建、修改、冲突、pending、幂等；AC10/12/13/14/18/20 等高风险边界有相称证据。
+- 只有 Fake 成功只能证明算法/状态机，不是 Provider 已保护并发。
+
+**G4/G5：**
+- ADP 每个 status 有正确边；实际企微单聊场景能完成 CREATE/UPDATE 与冲突决策；跨用户隔离和失败恢复通过。
+- 企微卡片/选项卡只在实际渠道验证后采用，默认文本选项。
+
+**G6：**
+- 受控用户、测试与生产配置/凭据隔离、错误日志脱敏、发布与回退路径、安全/权限、监控与操作核实机制就绪。
+- 关键失败路径通过；未执行项保留未验证风险和 Owner 决策，不能用跳过测试代替门禁。
+
+## 4. 当前可复验的实际命令
+
+请按项目已有 README 运行；其正式入口见 [README.md](../README.md)，测试事实源见 [tests/test_contracts.py](../tests/test_contracts.py)、[tests/test_unified_update.py](../tests/test_unified_update.py)。
+
+~~~powershell
+Set-Location -LiteralPath 'E:\work\05_ADP\03_Meeting_reservation'
+$env:PYTHONPATH = (Join-Path (Get-Location) 'src')
+& 'D:\python314\python.exe' -m pytest -q
+& 'D:\python314\python.exe' -m ruff check src tests
+& 'D:\python314\python.exe' -m meeting_reservation validate-examples --dir examples
+~~~
+
+本轮已有执行证据：67 passed，ruff 通过，18 示例通过；这是**阶段一**证据，不是 G2–G6 证据。开发新特性后按风险增加对应测试，只有真实 Provider 沙箱允许写入时才做实际写操作。
+
+## 5. 上线、运行和回退约束
+
+- 单独的开发/测试/生产身份、API 端点、数据和 Secret；不打印登录/用户凭证与会议敏感字段。
+- 新版本先对受控用户/测试会议资源开放，确认所有状态可观察，避免一次性影响所有会议室。
+- 出现严重风险可关闭会议写工具/回退 ADP 工作流；**已发出的 UNKNOWN 操作必须仍能核实真实状态**，不能靠关闭工具假设会议没有创建。
+- 不直接删除生产会议、修改真实用户日历或部署生产环境，除非有明确授权和对应回退/恢复措施。
+- 验证结果按当前环境、版本、Contract 与测试层记录；不以历史日志作为新环境已验证证据。
+
+具体执行进度与每项证据记录位置见 [roadmap/07-work-plan.md](07-work-plan.md)。

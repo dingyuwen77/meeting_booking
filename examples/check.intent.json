@@ -1,0 +1,15 @@
+{
+  "schema_version": "meeting.intent.v1",
+  "action": "CHECK",
+  "target": null,
+  "meeting": {
+    "title": null,
+    "start_at": "2026-11-05T14:00:00+08:00",
+    "end_at": "2026-11-05T15:00:00+08:00",
+    "timezone": "Asia/Shanghai",
+    "room_query": "A301",
+    "attendee_queries": [],
+    "description": null
+  },
+  "update": null
+}
