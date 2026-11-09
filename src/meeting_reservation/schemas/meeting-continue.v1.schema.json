@@ -57,6 +57,24 @@
               "const": "CANCEL"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fields"
+          ],
+          "properties": {
+            "kind": {
+              "const": "SUPPLY_FIELDS"
+            },
+            "fields": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "CREATE/CHECK 使用受限会议字段，UPDATE 使用 target/update；业务层负责按原意图校验字段。"
+            }
+          }
         }
       ]
     }

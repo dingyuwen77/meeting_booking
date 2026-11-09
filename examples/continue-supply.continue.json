@@ -1,0 +1,12 @@
+{
+  "schema_version": "meeting.continue.v1",
+  "operation_id": "op_supply_000001",
+  "pending_request_id": "pending_demo_001",
+  "expected_revision": 1,
+  "decision": {
+    "kind": "SUPPLY_FIELDS",
+    "fields": {
+      "end_at": "2026-12-01T07:00:00+00:00"
+    }
+  }
+}
