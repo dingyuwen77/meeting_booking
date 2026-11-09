@@ -9,5 +9,13 @@
   "message": "会议创建成功",
   "conflicts": [],
   "options": [],
-  "error": null
+  "error": null,
+  "confirmed_meeting": {
+    "meeting_id": "meeting_12345",
+    "meeting_number": "987654321",
+    "title": "产品评审会",
+    "start_at": "2026-12-01T06:00:00+00:00",
+    "duration_minutes": 60,
+    "join_url": "https://meeting.example.invalid/j/987654321"
+  }
 }

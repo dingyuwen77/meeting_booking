@@ -153,6 +153,44 @@
           }
         }
       ]
+    },
+    "confirmed_meeting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meeting_id",
+        "meeting_number",
+        "title",
+        "start_at",
+        "duration_minutes",
+        "join_url"
+      ],
+      "properties": {
+        "meeting_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "meeting_number": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "join_url": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "allOf": [
@@ -180,8 +218,14 @@
           },
           "error": {
             "type": "null"
+          },
+          "confirmed_meeting": {
+            "$ref": "#/properties/confirmed_meeting"
           }
-        }
+        },
+        "required": [
+          "confirmed_meeting"
+        ]
       }
     },
     {

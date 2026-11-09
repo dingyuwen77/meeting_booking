@@ -1,3 +1,5 @@
+> 历史方案快照（阶段一，2026-11-04）。此页仅保留原决策与证据；当前能力/命令/状态以 [roadmap/README.md](../README.md) 和 [docs/README.md](../../docs/README.md) 为准。
+
 # 05｜ADP 工作流与企业微信多轮交互
 
 > 仅在 G1 契约候选明确、G2 最小 MCP 联通试验通过、G3 业务执行具备可验证的服务端行为后，才进入完整工作流开发。**目前未实现。**
@@ -27,7 +29,7 @@
 
 ## 2. 建议配置顺序（不要一开始搭全部节点）
 
-1. 用已在 [roadmap/03-adp-mcp-spike.md](03-adp-mcp-spike.md) 验证过的工具创建最简画布：开始 → 工具 → 判断 → 回复。
+1. 用已在 [roadmap/archive/04_阶段一MCP联通计划.md](04_阶段一MCP联通计划.md) 验证过的工具创建最简画布：开始 → 工具 → 判断 → 回复。
 2. 新增 JSON 意图提取节点，只输出 CREATE/UPDATE/CHECK/OTHER 与当前机器契约的字段；提示词不要生成 user_id、is_admin、operation_id。
 3. 增加 Schema/参数验证边界。ADP 代码节点如果不能安装项目的 jsonschema/加载正式 Schema，应只做轻量校验并让 MCP 生产入口执行权威校验；**不在 ADP 手写一份逐渐漂移的完整 Schema**。
 4. 配置工具节点 submit_meeting_request；输入由可信调用层补充 operation_id，并通过真实认证机制获得用户身份。
@@ -45,7 +47,7 @@
 
 建议对输出进行以下业务约束（提示词是提示层，最终还必须经运行时校验）：
 
-- 只能输出当前 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 允许的形状，不要输出自创字段。
+- 只能输出当前 [src/meeting_reservation/schemas/meeting-intent.v1.schema.json](../../src/meeting_reservation/schemas/meeting-intent.v1.schema.json) 允许的形状，不要输出自创字段。
 - 查询空闲识别为 CHECK，不能因为存在完整时间和地点就自动当 CREATE。
 - “改会”要有定位线索；相对时间平移保留为 time_shift_minutes，不从缺失的原会议开始时间推造绝对时间。
 - 自然语言会议室、人员只是 query，真正 ID 由 MCP 解析；重名必须澄清。
@@ -66,7 +68,7 @@ ADP：以经认证身份恢复 P、发送补参，revision=1
 MCP：重新校验；如无冲突提交；如有冲突生成候选
 ~~~
 
-**当前机器契约不支持“补参”的 continue 动作**，要先按 [roadmap/02-contract-and-decisions.md](02-contract-and-decisions.md) 的 C01 补齐，不要在 ADP 侧虚构一个工具参数。
+**当前机器契约不支持“补参”的 continue 动作**，要先按 [roadmap/archive/03_阶段一契约与决策.md](03_阶段一契约与决策.md) 的 C01 补齐，不要在 ADP 侧虚构一个工具参数。
 
 同样，用户在冲突后说“换 A302，不要你给的两个选项”，只能走经过批准的申请修订机制，不能直接把自由文本伪装成旧 option_id。
 
@@ -96,4 +98,4 @@ MCP：重新校验；如无冲突提交；如有冲突生成候选
 - 工具返回 UNKNOWN 时不会向用户宣称成功/失败；可查询或安全停止。
 - 保存 ADP 画布版本/配置导出及测试记录，证明具体部署版本的节点正确连线。
 
-验收范围：[roadmap/06-test-and-release.md](06-test-and-release.md)。开发任务：[roadmap/07-work-plan.md](07-work-plan.md)。
+验收范围：[roadmap/archive/07_阶段一测试与交付计划.md](07_阶段一测试与交付计划.md)。开发任务：[roadmap/archive/08_阶段一任务清单.md](08_阶段一任务清单.md)。
