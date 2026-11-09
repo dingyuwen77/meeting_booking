@@ -591,3 +591,47 @@ def test_ambiguous_meeting_requires_selection_and_updates_only_chosen(tmp_path):
     assert chosen["meeting_id"] == second["meeting_id"]
     assert provider.meetings[int(first["meeting_id"])]["confName"] == "产品评审会"
     assert provider.created == 2
+
+
+@pytest.mark.parametrize("mode,endpoint", [
+    ("title", "confModify"), ("time", "confModify2"), ("room", "confModify2ByRoomId"),
+])
+@pytest.mark.parametrize("returned_id", [6001, 6002])
+def test_http_update_routes_preserve_options_and_confirm_original_id(
+    tmp_path, mode, endpoint, returned_id,
+):
+    """实际适配器选择正确修改端点、保留已知选项且拒绝错配会议号。"""
+    old = {"confId": 6001, "confPassword": "test-only", "muteWhenJoining": "y"}
+    captured = []
+
+    def handler(req):
+        """只在供应商网络边界记录真实修改请求。"""
+        captured.append(req)
+        return httpx.Response(200, json={"status": 100, "data": {"confId": returned_id}})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = BizVideoProvider(settings(tmp_path), client)
+
+        def invoke():
+            """通过公开修改入口触发对应会畅路由。"""
+            if mode == "title":
+                return provider.modify_simple(ACTOR, old, title="改会")
+            return provider.modify(
+                ACTOR, old, title="改会", start=datetime_future(), minutes=60, parties=25,
+                room_id=1001 if mode == "room" else None,
+            )
+
+        if returned_id != 6001:
+            with pytest.raises(ProviderUnknown):
+                invoke()
+        else:
+            assert invoke()["confId"] == 6001
+    req = captured[0]
+    assert req.method == "POST"
+    assert req.url.path.endswith("/" + endpoint)
+    fields = parse_qs(req.content.decode())
+    assert fields["confId"] == ["6001"]
+    assert fields["confPassword"] == ["test-only"]
+    assert fields["muteWhenJoining"] == ["y"]
+    if mode != "title":
+        assert fields["keepConfNo"] == ["1"]

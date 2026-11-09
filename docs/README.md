@@ -18,4 +18,4 @@
 
 **事实分层：** 当前功能应从源码和测试确认；字段机器契约只以 [src/meeting_reservation/schemas/](../src/meeting_reservation/schemas/) 为准；会畅真实能力以供应商文档与实际测试为准。未实测的外部能力不能因本地 Fake 测试通过而标为已完成。
 
-维护分工：本目录解释当前系统；机器字段以 Schema 为准；路线图维护验收状态；PR 记录对应 revision 的施工、测试与合并证据。原 docs/CONTRACT.md 与 docs/PHASE1.md 仅保留兼容导航。
+维护分工：本目录解释当前系统；机器字段以 Schema 为准；路线图维护验收状态；PR 记录对应 revision 的施工、测试与合并证据。原 [docs/CONTRACT.md](CONTRACT.md) 与 [docs/PHASE1.md](PHASE1.md) 仅保留兼容导航。
