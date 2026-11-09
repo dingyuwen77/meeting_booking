@@ -379,3 +379,32 @@ def test_provider_malformed_write_reply_is_unknown_but_read_error_is_not(tmp_pat
             )
         with pytest.raises(ProviderError):
             provider.scheduled(ACTOR)
+
+
+def test_token_timestamp_is_unique_even_in_the_same_millisecond(tmp_path, monkeypatch):
+    """会畅 token 只能使用一次，连续请求不能重复相同毫秒时间戳。"""
+    import meeting_reservation.bizvideo as bizvideo
+
+    cfg = settings(tmp_path)
+    stamps = []
+
+    def handler(req):
+        fields = parse_qs(req.content.decode())
+        stamps.append(int(fields["timeStamp"][0]))
+        return httpx.Response(200, json={"status": 100, "data": {"confId": 6001}})
+
+    monkeypatch.setattr(
+        bizvideo.time, "time_ns", lambda: 1_700_000_000_000_000_000
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = BizVideoProvider(cfg, client)
+        for _ in range(3):
+            provider.create(
+                ACTOR, title="测试会", start=datetime_future(),
+                minutes=60, parties=25,
+            )
+    assert stamps == [
+        1_700_000_000_000,
+        1_700_000_000_001,
+        1_700_000_000_002,
+    ]
