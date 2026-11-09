@@ -6,6 +6,7 @@
 import hashlib
 import time
 from datetime import datetime, timezone
+from threading import Lock
 from typing import Any
 
 import httpx
@@ -40,6 +41,8 @@ def parse_provider_time(value: str) -> datetime:
 class BizVideoProvider:
     def __init__(self, settings: Settings, client: httpx.Client | None = None):
         self.settings = settings
+        self._stamp_lock = Lock()
+        self._last_stamp = 0
         self.client = client or httpx.Client(
             timeout=settings.timeout_seconds, follow_redirects=False
         )
@@ -49,7 +52,11 @@ class BizVideoProvider:
         *, mutation: bool = False,
     ) -> dict[str, Any]:
         self.settings.require_provider()
-        stamp = int(time.time_ns() // 1_000_000)
+        # Tokens are single-use: calls in the same millisecond cannot reuse
+        # the same userId/APIKey/timestamp digest on this server instance.
+        with self._stamp_lock:
+            stamp = max(time.time_ns() // 1_000_000, self._last_stamp + 1)
+            self._last_stamp = stamp
         token = hashlib.md5(
             f"{actor.user_id}|{self.settings.api_key}|{stamp}".encode("utf-8")
         ).hexdigest().upper()
