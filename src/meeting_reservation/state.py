@@ -137,6 +137,28 @@ class StateStore:
             db.commit()
         return pending_id, 1, expires
 
+    def read_pending(
+        self, actor: Actor, pending_id: str, revision: int
+    ) -> tuple[dict, list[dict]]:
+        """补参校验前先读取，不因为输入错误消耗申请。"""
+        with closing(self._connect()) as db:
+            row = db.execute(
+                "SELECT * FROM pending_requests WHERE pending_id = ?", (pending_id,)
+            ).fetchone()
+        if row is None:
+            raise StateError("NOT_FOUND")
+        self._validate_pending(row, actor, revision)
+        return json.loads(row["intent_json"]), json.loads(row["options_json"])
+
+    @staticmethod
+    def _validate_pending(row: sqlite3.Row, actor: Actor, revision: int) -> None:
+        if row["actor_key"] != actor.key:
+            raise StateError("DENIED")
+        if row["used"] or row["revision"] != revision:
+            raise StateError("STALE_PENDING")
+        if datetime.fromisoformat(row["expires_at"]) < datetime.now(timezone.utc):
+            raise StateError("EXPIRED")
+
     def consume_pending(
         self, actor: Actor, pending_id: str, revision: int
     ) -> tuple[dict, list[dict]]:
@@ -149,14 +171,7 @@ class StateStore:
                 ).fetchone()
                 if row is None:
                     raise StateError("NOT_FOUND")
-                if row["actor_key"] != actor.key:
-                    raise StateError("DENIED")
-                if row["used"] or row["revision"] != revision:
-                    raise StateError("STALE_PENDING")
-                if datetime.fromisoformat(row["expires_at"]) < datetime.now(
-                    timezone.utc
-                ):
-                    raise StateError("EXPIRED")
+                self._validate_pending(row, actor, revision)
                 db.execute(
                     "UPDATE pending_requests SET used = 1 WHERE pending_id = ?",
                     (pending_id,),

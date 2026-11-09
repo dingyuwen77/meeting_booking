@@ -154,6 +154,24 @@ class BizVideoProvider:
             raise ProviderUnknown("远端返回创建成功但缺少会议 ID")
         return result
 
+    def modify_simple(
+        self, actor: Actor, old: dict[str, Any], *, title: str,
+    ) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "confId": int(old["confId"]),
+            "confName": title,
+        }
+        for name in (
+            "confPassword", "optionJbh", "optionVideoParticipants",
+            "muteWhenJoining", "channelId",
+        ):
+            if name in old and old[name] is not None:
+                data[name] = old[name]
+        result = self._request("POST", "confModify", actor, data).get("data")
+        if not isinstance(result, dict) or not result.get("confId"):
+            raise ProviderUnknown("普通修改结果缺少会议 ID")
+        return result
+
     def modify(
         self, actor: Actor, old: dict[str, Any], *,
         title: str, start: datetime, minutes: int, parties: int,

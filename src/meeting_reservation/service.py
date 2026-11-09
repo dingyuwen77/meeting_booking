@@ -190,19 +190,19 @@ class MeetingService:
             raise ProviderError("PROVIDER_RESPONSE", "会议可用资源格式异常") from exc
 
     def _meeting_parameters(
-        self, meeting: dict, op_id: str
+        self, meeting: dict, require_title: bool,
     ) -> tuple[str, datetime, datetime, int] | dict:
-        missing = [
-            name for name in ("title", "start_at", "end_at")
-            if not meeting.get(name)
-        ]
+        required = ("title", "start_at", "end_at") if require_title else (
+            "start_at", "end_at"
+        )
+        missing = [name for name in required if not meeting.get(name)]
         if missing:
             return {"missing": missing}
         if meeting.get("attendee_queries") or meeting.get("description") is not None:
             raise ValueError(
                 "会畅预约接口未确认支持参会者邀请或会议描述，不能静默丢弃这些字段"
             )
-        title = meeting["title"]
+        title = meeting.get("title") or "空闲查询"
         if _BAD_TITLE.search(title):
             raise ValueError("会议名称含会畅不支持的特殊字符")
         start = _date(meeting["start_at"])
@@ -213,7 +213,9 @@ class MeetingService:
         self, actor: Actor, op_id: str, intent: dict,
     ) -> dict:
         meeting = intent["meeting"]
-        params = self._meeting_parameters(meeting, op_id)
+        params = self._meeting_parameters(
+            meeting, require_title=intent["action"] == "CREATE"
+        )
         if isinstance(params, dict):
             return self._pending(
                 actor, op_id, intent, "NEED_INPUT",
@@ -365,12 +367,20 @@ class MeetingService:
             end = _date(changes["end_at"])
         minutes = _interval(start, end)
         room_id = self._room_id(changes.get("room_query"))
+        changed_time = (
+            shift is not None or "start_at" in changes or "end_at" in changes
+        )
         if not self.settings.write_enabled:
             return result(
                 op_id, "DENIED", "真实会议写入尚未启用",
                 error_code="WRITE_DISABLED",
             )
-        if self._user_conflict(actor, start, end, exclude_id=resolved):
+        if not changed_time and room_id is None:
+            updated = self.provider.modify_simple(actor, old, title=title)
+            return self._complete(actor, op_id, int(updated["confId"]))
+        if changed_time and self._user_conflict(
+            actor, start, end, exclude_id=resolved
+        ):
             return self._pending(
                 actor, op_id, intent, "CONFLICT", "修改后与当前用户其他会议冲突",
             )
@@ -460,12 +470,15 @@ class MeetingService:
         op_id = request["operation_id"]
 
         def run() -> dict:
-            intent, options = self.store.consume_pending(
+            intent, options = self.store.read_pending(
                 actor, request["pending_request_id"], request["expected_revision"]
             )
             decision = request["decision"]
             kind = decision["kind"]
             if kind == "CANCEL":
+                self.store.consume_pending(
+                    actor, request["pending_request_id"], request["expected_revision"]
+                )
                 return result(op_id, "CANCELLED", "已取消待处理申请，不影响真实会议")
             if kind == "SELECT_OPTION":
                 item = next(
@@ -496,6 +509,9 @@ class MeetingService:
             else:
                 raise ValueError("不支持的后续决策")
             validate_payload("intent", intent)
+            self.store.consume_pending(
+                actor, request["pending_request_id"], request["expected_revision"]
+            )
             return self._execute(actor, op_id, intent)
 
         def execute() -> dict:

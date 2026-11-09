@@ -42,7 +42,11 @@ def verify_identity(
     fields = {str(k).lower(): str(v) for k, v in headers.items()}
     encoded = fields.get("x-meeting-actor", "")
     signature = fields.get("x-meeting-signature", "")
-    if not encoded or len(encoded) > 2048 or len(signature) != 64:
+    if (
+        not encoded or len(encoded) > 2048
+        or re.fullmatch(r"[A-Za-z0-9_-]+", encoded) is None
+        or re.fullmatch(r"[A-Fa-f0-9]{64}", signature) is None
+    ):
         raise IdentityError("缺少有效身份签名")
     expected = hmac.new(
         settings.identity_secret.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256
