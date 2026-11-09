@@ -45,7 +45,8 @@ class BizVideoProvider:
         )
 
     def _request(
-        self, method: str, path: str, actor: Actor, params: dict[str, Any]
+        self, method: str, path: str, actor: Actor, params: dict[str, Any],
+        *, mutation: bool = False,
     ) -> dict[str, Any]:
         self.settings.require_provider()
         stamp = int(time.time_ns() // 1_000_000)
@@ -71,13 +72,25 @@ class BizVideoProvider:
             resp.raise_for_status()
             payload = resp.json()
         except (httpx.TimeoutException, httpx.TransportError) as exc:
-            raise ProviderUnknown("会畅请求超时或网络中断，结果待核实") from exc
-        except (httpx.HTTPStatusError, ValueError) as exc:
-            raise ProviderError("PROVIDER_RESPONSE", "会畅 HTTP 或响应格式异常") from exc
+            if mutation:
+                raise ProviderUnknown("会畅写请求超时或网络中断，结果待核实") from exc
+            raise ProviderError("PROVIDER_NETWORK", "会畅读取请求网络异常") from exc
+        except httpx.HTTPStatusError as exc:
+            if mutation and exc.response.status_code >= 500:
+                raise ProviderUnknown("会畅写请求返回服务器错误，结果待核实") from exc
+            raise ProviderError("PROVIDER_HTTP", "会畅返回 HTTP 错误") from exc
+        except ValueError as exc:
+            if mutation:
+                raise ProviderUnknown("会畅写请求响应不可解析，结果待核实") from exc
+            raise ProviderError("PROVIDER_RESPONSE", "会畅读取响应格式异常") from exc
         if not isinstance(payload, dict):
+            if mutation:
+                raise ProviderUnknown("会畅写请求返回非对象，结果待核实")
             raise ProviderError("PROVIDER_RESPONSE", "会畅响应不是对象")
         status = str(payload.get("status"))
         if status != "100":
+            if mutation and status in ("103", "112"):
+                raise ProviderUnknown("会畅写请求返回不确定服务器状态，结果待核实")
             # 不透传内部错误正文，避免把用户/会议/服务端细节暴露给模型。
             raise ProviderError(status, "会畅返回业务失败状态：" + status)
         return payload
@@ -149,7 +162,9 @@ class BizVideoProvider:
         else:
             data["roomId"] = room_id
             path = "confReservationByRoomId"
-        result = self._request("POST", path, actor, data).get("data")
+        result = self._request(
+            "POST", path, actor, data, mutation=True
+        ).get("data")
         if not isinstance(result, dict) or not result.get("confId"):
             raise ProviderUnknown("远端返回创建成功但缺少会议 ID")
         return result
@@ -167,7 +182,9 @@ class BizVideoProvider:
         ):
             if name in old and old[name] is not None:
                 data[name] = old[name]
-        result = self._request("POST", "confModify", actor, data).get("data")
+        result = self._request(
+            "POST", "confModify", actor, data, mutation=True
+        ).get("data")
         if not isinstance(result, dict) or not result.get("confId"):
             raise ProviderUnknown("普通修改结果缺少会议 ID")
         return result
@@ -198,7 +215,9 @@ class BizVideoProvider:
             path = "confModify2ByRoomId"
         else:
             path = "confModify2"
-        result = self._request("POST", path, actor, data).get("data")
+        result = self._request(
+            "POST", path, actor, data, mutation=True
+        ).get("data")
         if not isinstance(result, dict) or not result.get("confId"):
             raise ProviderUnknown("远端返回修改成功但缺少会议 ID")
         return result
