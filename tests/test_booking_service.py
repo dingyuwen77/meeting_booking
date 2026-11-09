@@ -334,3 +334,48 @@ def test_sqlite_restart_restores_operation_ledger(tmp_path):
     same = MeetingService(svc.settings, StateStore(svc.settings.db_path), fake)
     assert same.submit(ACTOR, data) == before
     assert fake.created == 1
+
+
+@pytest.mark.parametrize(
+    ("status_code", "payload", "expected"),
+    [
+        (503, {"status": 100}, ProviderUnknown),
+        (200, {"status": 103}, ProviderUnknown),
+        (200, {"status": 202}, ProviderError),
+    ],
+)
+def test_provider_write_uncertainty_is_not_reported_as_definite_failure(
+    tmp_path, status_code, payload, expected
+):
+    """HTTP 5xx / server-internal status after a write may hide a successful booking."""
+    cfg = settings(tmp_path)
+    transport = httpx.MockTransport(
+        lambda req: httpx.Response(status_code, json=payload)
+    )
+    with httpx.Client(transport=transport) as client:
+        provider = BizVideoProvider(cfg, client)
+        with pytest.raises(expected):
+            provider.create(
+                ACTOR, title="测试会", start=datetime_future(),
+                minutes=60, parties=25,
+            )
+
+
+def test_provider_malformed_write_reply_is_unknown_but_read_error_is_not(tmp_path):
+    """会畅写响应损坏不应诱导重试；只读接口故障可明确归类。"""
+    cfg = settings(tmp_path)
+    with httpx.Client(
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(
+                200, content=b"not-json", headers={"content-type": "application/json"}
+            )
+        )
+    ) as client:
+        provider = BizVideoProvider(cfg, client)
+        with pytest.raises(ProviderUnknown):
+            provider.create(
+                ACTOR, title="测试会", start=datetime_future(),
+                minutes=60, parties=25,
+            )
+        with pytest.raises(ProviderError):
+            provider.scheduled(ACTOR)
