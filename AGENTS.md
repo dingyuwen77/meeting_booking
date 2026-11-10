@@ -30,14 +30,14 @@
 | [src/meeting_reservation/settings.py](src/meeting_reservation/settings.py) | 环境变量配置与默认关闭的真实写入开关 |
 | [src/meeting_reservation/cli.py](src/meeting_reservation/cli.py) | 本地 JSON 契约校验；保留 `meeting-contract` 与 `python -m meeting_reservation` 入口 |
 
-架构与身份机制的完整解释由 [docs/architecture/01_系统架构与业务边界.md](docs/architecture/01_系统架构与业务边界.md)、[docs/architecture/02_身份认证与操作状态.md](docs/architecture/02_身份认证与操作状态.md) 承担。
+架构与身份机制由 [docs/architecture/01_系统架构与业务边界.md](docs/architecture/01_系统架构与业务边界.md)、[docs/architecture/02_身份认证与操作状态.md](docs/architecture/02_身份认证与操作状态.md) 解释；按功能查找实现与测试请用 [docs/architecture/03_代码结构与调用链导航.md](docs/architecture/03_代码结构与调用链导航.md)。
 
 ## Contract 与业务不变项
 
 五份版本化 JSON Schema 是唯一字段契约源；[examples/](examples/) 是示例，不另立定义。修改契约时同时检查校验器、MCP 投影、CLI、示例、测试及 ADP 消费说明，不手写第二套工具字段。当前 V1 仍是未完成租户联调的候选；正式冻结后的破坏性变化需要新版本。语义解释见 [docs/contracts/01_标准化会议协议.md](docs/contracts/01_标准化会议协议.md)、[docs/contracts/02_会议操作与状态语义.md](docs/contracts/02_会议操作与状态语义.md)。
 
 - ADP 负责提取意图和多轮界面；真实成员身份来自每次工具调用的可信签名 Header。企微 UserID 原样作为会畅 userId，但模型参数、昵称或静态 Header 不能代替认证；不能为了联通关闭身份验证。
-- CREATE 需要标题和起止时间；会议方数来自受控服务配置。CHECK 只检查会畅资源与本人预约重叠，不创建或修改会畅会议；查询可用不等于最终提交成功。
+- CREATE 需要标题和起止时间；会议方数来自受控服务配置。CHECK 只检查会畅资源与本人预约重叠，不创建或修改会畅会议；经业务 Tool 执行时仍写本地操作台账（缺参可产生 pending）。查询可用不等于最终提交成功。
 - UPDATE 先读取原会议并校验归属和状态，再更新同一会议。保持 `time_shift_minutes + changes` 的统一结构；相对与绝对时间互斥，未指定字段保持原值，不恢复旧 SHIFT/PATCH 模式。
 - 会畅 `roomId` 是虚拟资源；仅接受明确的 `bizvideo-room:<roomId>`，不能把 A301 等实体会议室名称映射过去。当前不支持自动邀请、会议描述写入或取消已创建会议；不支持的写入必须明确拒绝，不静默丢弃。
 - 只有写后回读完整、归属与会议 ID 核对正确且结果契约有效，才能返回 COMMITTED。超时、断连或写后确认失败产生 UNKNOWN 时，禁止自动重放或换操作号碰运气重建；通过原操作查询及受控人工核实恢复。
@@ -69,7 +69,7 @@ Fake、HTTP Mock、本地 SDK 测试不能证明真实会畅、ADP 或企业微�
 ## 文档、CI 与 Git 边界
 
 - 当前说明维护在 [docs/README.md](docs/README.md) 导航的架构、契约、集成、操作和测试专题中。行为变化时同步直接相关说明、示例与验收状态；机器字段留在 Schema，不在本文件复制完整定义。
-- 沿用项目按主题分类、中文编号的文档结构。[docs/CONTRACT.md](docs/CONTRACT.md) 与 [docs/PHASE1.md](docs/PHASE1.md) 仅为兼容导航，当前需求不写回历史归档。
+- 沿用项目按主题分类、中文阅读编号的文档结构；当前入口以 [docs/README.md](docs/README.md) 为准。阶段一历史原文位于 [docs/archive/](docs/archive/) 与 [roadmap/archive/](roadmap/archive/)；不保留重复的历史跳转壳文件，不将新需求写回历史归档。
 - 沿用路线图承载需求和验收状态、任务记录及获授权 PR 承载实施与验证证据的现有方式；当前没有独立 Change/RFC/ADR 制度，不为日常开发并行增设一套。
 - 仓库当前没有 GitHub Actions 工作流或自动部署，不因治理引导新增 CI。没有工作流或检查结果不能写成“CI 通过”，也不能据此推断远程分支保护、Review 或合并门禁不存在。
 - Git 操作遵守当前任务授权与实际平台门禁。历史路线图中的单次 Review 豁免不延续到后续任务；本地验证、提交和推送均不等于合并、发布或生产启用。
@@ -79,5 +79,5 @@ Fake、HTTP Mock、本地 SDK 测试不能证明真实会畅、ADP 或企业微�
 - [.env.example](.env.example) 只作脱敏配置模板。Python 不自动加载 `.env`，实际值由运行环境注入；Compose 使用环境文件。不得把 API Key、Token、身份签名、会议密码、敏感入会链接或完整原始请求写入治理文档、日志、fixture 或 Git；本地文件忽略规则见 [.gitignore](.gitignore)。
 - 真实写入默认关闭。只有完成真实站点、可信网关、ADP 与企微验收并取得目标环境授权后，才允许开启 `MEETING_WRITE_ENABLED`；治理校准和本地测试不能解除该门禁。
 - 现有 [Dockerfile](Dockerfile)、[compose.yaml](compose.yaml) 面向单机部署，Compose 指定 `linux/arm64`、宿主回环端口及 SQLite 持久卷。保持保守单实例与共享持久化边界，不把互不共享台账的多副本当成受支持部署。
-- 修改台账结构、升级或恢复前核对现有数据与备份；当前只有启动建表，没有独立版本化 Migration 工具。回滚保留操作历史并关闭写入，不会撤销已在会畅创建的会议；UNKNOWN 仍需核实。具体操作由 [docs/operations/02_部署与故障恢复.md](docs/operations/02_部署与故障恢复.md) 维护。
+- 修改台账结构、升级或恢复前核对现有数据与备份；当前只有启动建表，没有独立版本化 Migration 工具。回滚保留操作历史并关闭写入，不会撤销已在会畅创建的会议；UNKNOWN 仍需核实。具体操作由 [docs/operations/02_部署配置与运行维护.md](docs/operations/02_部署配置与运行维护.md) 和 [docs/operations/03_故障排查与恢复.md](docs/operations/03_故障排查与恢复.md) 维护。
 - 未确认：供应商原 PDF 未入库；仓库记录的 v1.0.10 映射仍需原文与真实站点复核。真实权限、容量、提交原子性、特殊字段保留、并发及超时恢复，以及 ADP 动态身份透传和企微端到端，均不能从本地测试推导为通过。后续按 [docs/testing/01_测试与联调验收.md](docs/testing/01_测试与联调验收.md)、[docs/integrations/02_腾讯ADP与MCP接入.md](docs/integrations/02_腾讯ADP与MCP接入.md) 取得证据。

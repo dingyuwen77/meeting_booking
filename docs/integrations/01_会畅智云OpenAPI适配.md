@@ -1,41 +1,52 @@
 # 会畅智云账号模式 OpenAPI 适配
 
-## 依据与前提
+## 为什么将会畅接口放在 Provider 内
 
-Provider 依据用户提供的《会畅智云账号模式 Open API》**v1.0.10（2026-03-27）**实现，不是另一套公共业务协议。正式使用前必须向会畅申请站点、开通 OpenAPI 权限，获得 `siteSign`、`APIKey` 并使用隔离测试账号测试；当前仓库没有这些凭据。
+业务层使用统一的时间、身份和会议状态，不能直接依赖会畅各端点的表单格式、GMT 时间与供应商状态码。[src/meeting_reservation/bizvideo.py](../../src/meeting_reservation/bizvideo.py) 是这些差异的唯一适配入口，业务统一结果由 [src/meeting_reservation/service.py](../../src/meeting_reservation/service.py) 生成。
 
-原 PDF 未入库；本轮续接未取得可重新读取的附件，因此这里记录的是前次实现的资料版本和映射依据。HTTP Mock 只能证明本代码发出了什么，端点章节、响应字段及租户权限仍需用原文与真实测试站点复核。
+当前代码依据此前记录的《会畅智云账号模式 Open API》**v1.0.10（2026-03-27）**编写；原 PDF 未在仓库中可复核，**以下接口名称、状态含义和字段仍需供应商原文与真实租户核验**。HTTP Mock 只证明本项目发送了这些请求，不证明远端服务器在当前租户接受它们。
 
-## Token 与网络格式
+## 认证、时间和 HTTP 格式
 
-每次请求使用 `token = MD5("UserId|APIKey|timeStamp").upper()`，`timeStamp` 为毫秒级时间戳；`UserId` 直接取已验签企业微信 UserID。会畅传入/返回的时间按 **GMT/UTC** 处理；POST 用 `application/x-www-form-urlencoded`，GET 用 Query，不是 JSON POST。真实结果需以 `status == 100` 为成功依据，HTTP 200 不能替代业务状态。实现见 [src/meeting_reservation/bizvideo.py](../../src/meeting_reservation/bizvideo.py)。
+1. 使用已验签的企微 UserID 作为会畅 `userId`，不是另建业务身份；服务器配置提供 `siteSign`、`APIKey`，不把密钥传给 ADP 模型。
+2. 每次请求生成毫秒 `timeStamp`，Token 算法为 `MD5("UserId|APIKey|timeStamp").upper()`；单个 Provider 实例通过锁保持所生成时间戳单调不重复。此机制不是跨多实例的分布式唯一性保证。
+3. 传入业务时间要求带时区偏移，Provider 对会畅使用 GMT/UTC 字符串；返回的无时区供应商时间按 GMT 解读。不要直接按北京时间字符串发送。
+4. GET 的参数在 Query；POST 使用 `application/x-www-form-urlencoded`，**不是 JSON POST**。HTTP 成功还要验证供应商业务 `status == 100`。
 
-## 已实现的端点映射
+部署变量见 [.env.example](../../.env.example)；配置解析见 [src/meeting_reservation/settings.py](../../src/meeting_reservation/settings.py)。
 
-| 能力 | 会畅端点 | 供应商章节 | 本项目规则 |
-| --- | --- | --- | --- |
-| 预约视频会议 | `confReservation` | 2.1 | userId/userName、confName、UTC startTime、duration、confParties |
-| 指定会畅虚拟资源预约 | `confReservationByRoomId` | 2.14 | 使用已验证 roomId |
-| 普通修改 | `confModify` | 2.2 | 只改会议名称等不涉及时间/方数的字段 |
-| 修改时间/时长/方数 | `confModify2` | 2.15 | 先读旧详情，再提交完整所需字段 |
-| 指定虚拟资源修改 | `confModify2ByRoomId` | 2.29 | 必须再次检查目标资源 |
-| 会议详情 | `getConfDetailByConfId` | 2.3 | 读取原会议、确认提交结果 |
-| 当前用户预约列表 | `getScheduledConfListByUserId` | 2.6 | 计算同用户会议时段重叠、名称定位 |
-| 站点资源状态 | `getAvailableRoomsBySiteSign` | 2.20 | 根据容量和时段查询可用资源数量 |
-| 站点会议室及会议列表 | `getRoomListAndConfListBySiteSign` | 2.13 | 指定 roomId 的会议时段占用 |
+## 代码中的端点与实际用途
 
-明确不支持：实体办公室 A301/A302 的自动映射、直接通过预约接口批量邀请与会者、直接写会议描述、PSTN/录制/纪要、已创建会议取消、会中延期等范围外操作。会畅 PDF 另有这些能力的接口章节，但**尚未纳入当前业务范围**。
+| 业务行为 | 会畅端点 | 本项目方式及用途 |
+| --- | --- | --- |
+| 创建普通视频会议 | `confReservation` | POST；名称、GMT 开始、duration、容量等 |
+| 指定虚拟资源创建 | `confReservationByRoomId` | POST；明确的 `roomId` |
+| 仅名称修改 | `confModify` | POST；避免误用不允许改时间的旧接口 |
+| 修改开始时间/时长 | `confModify2` | POST；端点携带会议方数参数，当前业务仍保留原会的方数；同时保留已知选项并请求保留会议号 |
+| 指定虚拟资源修改 | `confModify2ByRoomId` | POST；校验所选虚拟资源 |
+| 会议详情及写后确认 | `getConfDetailByConfId` | GET；核对会议 ID、归属、会议号、开始和时长 |
+| 本人已预约会议列表 | `getScheduledConfListByUserId` | **POST**；分页查询本人时段冲突、名称候选 |
+| 资源池空闲状态 | `getAvailableRoomsBySiteSign` | GET；容量/数量是否满足 |
+| 虚拟资源和其占用会议 | `getRoomListAndConfListBySiteSign` | GET；按 roomId 校验容量与时间冲突 |
 
-## 修改语义与数据保留
+`scheduled` 和 `rooms` 当前最多读取 20 页，每页请求 100 条；超过边界返回 `PAGE_LIMIT`，而不是静默只看前一部分。真实接口分页结构和供应商各端点行为须在站点验收。实体 A301 不是会畅 roomId，不得混用。
 
-`confModify` **不能**改开始时间、时长、方数；需要这些能力时使用 `confModify2`。对于相对平移，先读取原开始时间与 duration，做时间运算后再提交；同时保留已知密码、入会选项、入会静音等字段。提出 `keepConfNo=1` 以保持会议号，实际行为必须在测试租户核实。
+## 更新与写后回读边界
 
-当前 Provider 仍不能证明所有供应商可选字段均会在不同会议配置下完整回读；在未验证特殊直播/渠道会议前，应限制真实写入于普通预约会议场景。
+- UPDATE 在业务层先读取原会议信息、检验归属与是否未开始；仅改名使用 `confModify`，时间/资源变化使用 `confModify2` 相关路由。
+- Provider 在修改请求中携带原详情中**已知且存在**的若干密码/入会/静音/渠道字段，并设置 `keepConfNo=1`。这是代码尝试保留信息的方式，不能证明特殊会议的所有可选字段都能无损往返。
+- 会畅返回成功后，`service._complete` 再读详情并检查身份、会议 ID、会议号、名称、时间、时长及链接等结果约束，最后才能返回 `COMMITTED`。
+- 暂不支持在当前会议预约/修改链路写入邀请名单、会议描述；这些字段即使可在 Schema 表达，也会被业务层明确拒绝。
 
-## 错误与部分失败
+## 失败与待核实
 
-会畅 `100` 成功、`202` 时间冲突、`205` 无资源、`401` 会议不存在或无归属、`102` Token/权限失败。具体错误含义以原 PDF 为准。网络超时、远端已经成功但丢失响应、回读缺失必要详情时必须进入 `UNKNOWN`，不能重新调用创建 API。
+| 场景 | 本项目处理边界 |
+| --- | --- |
+| 明确业务拒绝（例如冲突相关状态） | 返回 ProviderError；业务层对已识别的 `202`/`205` 走冲突分支 |
+| 只读查询的网络/响应异常 | 返回明确的读取失败，不视为远端写入未知 |
+| 写入超时、断连、服务器不确定响应、无法解析返回值 | `ProviderUnknown` → `UNKNOWN` |
+| 写后响应会议 ID 非法、与原会议不符，或详情回读不完整 | `UNKNOWN`，不得用新操作号盲重试 |
 
-写响应缺少业务状态、会议号格式损坏、修改响应指向其他会议，以及写后回读网络失败、归属/会议号错配或结果字段不合法，也进入 `UNKNOWN`。Provider 的连接由 MCP 生命周期释放；外部注入测试连接由测试调用方关闭。
+既有文档记录的 `100`、`202`、`205`、`401`、`102` 等供应商代码**必须以供应商原 PDF 和实际站点为准**。不能从 HTTP 200 推导业务成功，也不能从本地一次 CHECK 可用推导提交原子性、外部幂等或全站并发安全。
 
-**尚未确认的服务端事实：** 提交原子性、第三方幂等键、供应商是否允许乐观版本更新、不同模式下可选字段语义。这些必须经测试 API 验证，不能由 Fake 或静态 PDF 文档推导为已成立。
+实际核对与外部试验见 [docs/testing/01_测试与联调验收.md](../testing/01_测试与联调验收.md)，异常恢复见 [docs/operations/03_故障排查与恢复.md](../operations/03_故障排查与恢复.md)。

@@ -1,26 +1,41 @@
 # 腾讯 ADP 与 MCP 接入
 
-## 目标与当前状态
+## 目标、当前能力与外部缺口
 
-本仓库实现官方 Python MCP SDK v2 的 Streamable HTTP 服务，提供 `initialize/tools/list/tools/call` 所需的 SDK 协议能力及业务工具。**尚未在用户的腾讯 ADP 租户上完成在线握手和结构化结果验证**，不能仅凭存在工具函数就宣称 ADP 接通。
+本仓库使用 Python MCP SDK v2 提供 Streamable HTTP 服务，具备 MCP `initialize`、`tools/list`、`tools/call` 的协议入口和 5 个 Tool；[tests/test_mcp_runtime.py](../../tests/test_mcp_runtime.py) 中有真实 SDK HTTP/ASGI 接线测试（会畅网络被 Mock）。**尚未有腾讯 ADP 租户真实握手、动态身份 Header 和企业微信端到端证据**，不能据此宣称在线应用已接入。
 
-腾讯 ADP 官方自定义 MCP 接入入口：[新建 MCP 工具](https://cloud.tencent.com/document/product/1759/117855)。具体传输、Header 和结果字段支持以当前租户与官方页面为准；静态 Header 自身不能证明每次企微请求的最终用户身份。
+ADP 端自定义 MCP 的配置方式请核对官方 [新建 MCP 工具](https://cloud.tencent.com/document/product/1759/117855) 文档及当前租户实际能力；本仓库不维护在线 ADP 画布或企微网关。
 
-## 最小连接顺序
+## 本仓库实际暴露的工具
 
-1. 在可信网络/TLS 反向代理后部署本服务，Streamable HTTP 地址为 `https://<host>/mcp`。禁止直接对公网开放无访问控制的服务。
-2. 本地 MCP Client 先验证 `ping_meeting_server`，并检查 `tools/list` 能列出全部五个 Tool。
-3. 在 ADP 测试应用通过“连接器与工具 → 自定义工具 → 基于 MCP 创建”，配置服务器 URL，测试工具发现和 ping。
-4. 用固定无副作用测试消息验证入参与 `structuredContent.status` 的下游节点读取方式。当前 MCP Tool 外层参数名为 `request`；工具发现已从原有机器契约展开完整 Schema。服务端仍独立校验，ADP 能否按该结构生成与消费消息必须实测。
-5. 测试不同企微成员的原始 UserID 能否经**可信网关动态签名**传给 MCP；静态 Header 或模型自报 `user_id` 都不合格。
-6. 未验证可信身份之前，所有真实提交工具保持 `MEETING_WRITE_ENABLED=false`。身份通过后再使用独立会畅测试站点做受控真实预约。
+| 工具 | 用途 | 身份要求 |
+| --- | --- | --- |
+| `ping_meeting_server` | 服务可用性探针，不访问会畅 | 不需要 |
+| `whoami_probe` | 验证动态签名身份是否到达服务 | 需要 |
+| `submit_meeting_request` | CREATE/CHECK/UPDATE；外层参数名 `request` | 需要 |
+| `continue_meeting_request` | 按 pending 与 revision 补参、选项或取消申请 | 需要 |
+| `get_meeting_operation` | 读取同用户原操作状态，不重复执行会畅写入 | 需要 |
 
-## 多轮恢复
+五份机器消息契约来自 [src/meeting_reservation/schemas/](../../src/meeting_reservation/schemas/)，MCP `tools/list` 的业务 Tool Schema 是自动展开引用后的投影；`structuredContent` 返回业务结果。实现见 [src/meeting_reservation/mcp_server.py](../../src/meeting_reservation/mcp_server.py)。
 
-ADP 不得单凭模型记忆生成 pending ID。业务服务会返回 `pending_request_id`、`pending_revision`、`expires_at`，由可信调用层保存/关联到当前企微会话和用户。用户补时间、修改要求或选择候选后，以新 `operation_id` 调用 `continue_meeting_request`；用户要求查原执行结果时调用 `get_meeting_operation`。只有后端确认为 `COMMITTED` 才能发“已预约/已修改”的确定消息。
+## 按依赖顺序的联调流程
 
-## 实际需要验证的接口边界
+1. **本地独立测试**：启动 Streamable HTTP MCP，用客户端/Inspector 完成 `initialize`、`tools/list` 和免身份 `ping_meeting_server`。不要直接把 `/mcp` 当自定义 REST JSON 接口。
+2. **网关与可达性**：为 ADP 调用方提供符合安全要求的 HTTPS 地址及访问控制；先核对服务、反向代理与 SDK 的 Host/Origin 策略。
+3. **ADP 工具发现**：在测试应用配置 `/mcp` URL，检查 5 个工具、展开后的 `inputSchema/outputSchema` 和业务工具的外层 `request` 是否实际被识别。
+4. **结构化结果消费**：用无远端写副作用的输入验证 ADP 是否能读取 `structuredContent.status`、错误与 pending/确认摘要字段，避免把模型自造值当成成功结果。
+5. **可信身份链**：企微可信网关核验原始事件身份，每次调用生成短时签名 `X-Meeting-Actor`/`X-Meeting-Signature`。先用 `whoami_probe` 验证不同测试用户的 UserID，且无法跨用户冒用。静态 Header、模型参数或昵称不是动态认证。
+6. **跨轮关联**：调用层保存原 `operation_id`、pending ID、revision、有效期和实际会话/用户关联；在继续处理时提供新操作号和原 pending。错误重试使用**同一业务操作号**，不能盲目重新创建。
+7. **受控真实写入**：只有身份、站点权限、会畅、ADP 结果和目标环境授权满足后，才在隔离资源验证 CREATE/UPDATE 并考虑开启写开关。
 
-腾讯 ADP 能否展开/解析 MCP 生成的字典 Tool Schema、是否支持准确读取 `structuredContent`、超时与错误时是否正确路由、是否能够经可信网关携带每轮不同 UserID、对话状态是否能跨轮恢复。这些都是平台/租户的**实验任务**，不是本仓库现有单测的证明。
+如果当前腾讯 ADP 接入方式**无法动态转发可信签名 Header**，必须先由上游可信代理/网关形成可验证的身份传递方案。这是外部架构前置，不允许为连通而关闭认证。
 
-不在当前仓库直接修改生产 ADP 画布或企微消息网关。后续真实联调参照 [docs/testing/01_测试与联调验收.md](../testing/01_测试与联调验收.md)。
+## ADP 结果分支应如何消费
+
+- `NEED_INPUT` / `NEED_SELECTION` / `CONFLICT`：展示可理解的问题或候选，保留真实 `pending_request_id`、`pending_revision` 和 `expires_at`，下一轮调用 `continue_meeting_request`，不能只靠模型“记住”候选 ID。
+- `AVAILABLE`：只说明资源目前看起来可用，不发送“已预约”。
+- `COMMITTED`：仅使用后端 `confirmed_meeting` 表示已确认的会畅事实。
+- `IN_PROGRESS` / `UNKNOWN`：使用**原 operation_id** 查已存状态；UNKNOWN 不会因查询自动消除，应由有权限人员核实远端。
+- `DENIED`/`INVALID`/`FAILED` 等：按安全错误提示，不向用户泄露 APIKey、Token 或签名内容。
+
+真实验收矩阵与记录范围在 [docs/testing/01_测试与联调验收.md](../testing/01_测试与联调验收.md)。本仓库不直接修改生产 ADP 配置或企微网关。
