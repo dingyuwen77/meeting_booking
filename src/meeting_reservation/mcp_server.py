@@ -1,7 +1,8 @@
 """腾讯 ADP 可接入的 Streamable HTTP MCP Server。
 
 真实写操作默认关闭。最终成员身份仅从可信网关签名的 HTTP Header 取得。
-本模块依赖官方 mcp Python SDK v2；不得让模型通过 JSON 提供 userId。
+本模块依赖官方 mcp Python SDK v2；业务身份不得从 JSON 取得。
+可选临时参数探针只回显收到的 UserID，不能用于会议身份认证。
 """
 
 import asyncio
@@ -15,6 +16,7 @@ from mcp.server.mcpserver import Context, MCPServer
 from .bizvideo import BizVideoProvider
 from .contract import get_inline_schema
 from .identity import verify_identity
+from .identity_probe import register_identity_probe
 from .service import MeetingService
 from .settings import Settings
 from .state import StateStore
@@ -53,9 +55,6 @@ class MeetingMCPServer(MCPServer):
         return tools
 
 
-mcp = MeetingMCPServer("meeting-booking", version="0.2.0", lifespan=_lifespan)
-
-
 @lru_cache(maxsize=1)
 def _service() -> MeetingService:
     """在事件循环首次业务调用时创建并复用服务依赖。"""
@@ -73,20 +72,17 @@ def _actor(ctx: Context):
     return verify_identity(ctx.headers or {}, svc.settings)
 
 
-@mcp.tool()
 def ping_meeting_server() -> dict[str, Any]:
     """只读握手探针：不访问会畅，也不暴露凭据或用户信息。"""
     return {"ok": True, "service": "meeting-booking", "protocol": "meeting.v1"}
 
 
-@mcp.tool()
 async def whoami_probe(ctx: Context) -> dict[str, Any]:
     """验证企微用户身份是否经可信网关动态签名；不接受模型指定用户。"""
     actor = _actor(ctx)
     return {"corp_id": actor.corp_id, "user_id": actor.user_id}
 
 
-@mcp.tool()
 async def submit_meeting_request(
     request: dict[str, Any], ctx: Context,
 ) -> dict[str, Any]:
@@ -95,7 +91,6 @@ async def submit_meeting_request(
     return await asyncio.to_thread(_service().submit, actor, request)
 
 
-@mcp.tool()
 async def continue_meeting_request(
     request: dict[str, Any], ctx: Context,
 ) -> dict[str, Any]:
@@ -104,13 +99,27 @@ async def continue_meeting_request(
     return await asyncio.to_thread(_service().continue_request, actor, request)
 
 
-@mcp.tool()
 async def get_meeting_operation(
     request: dict[str, Any], ctx: Context,
 ) -> dict[str, Any]:
     """只读查询 operation_id 的已存状态；不重新执行会畅写操作。"""
     actor = _actor(ctx)
     return await asyncio.to_thread(_service().get_operation, actor, request)
+
+
+def create_server() -> MeetingMCPServer:
+    """构造原有五个工具及按启动开关注册的临时探针，保持业务依赖惰性创建。"""
+    server = MeetingMCPServer("meeting-booking", version="0.2.0", lifespan=_lifespan)
+    for tool in (
+        ping_meeting_server, whoami_probe, submit_meeting_request,
+        continue_meeting_request, get_meeting_operation,
+    ):
+        server.tool()(tool)
+    register_identity_probe(server)
+    return server
+
+
+mcp = create_server()
 
 
 def main() -> None:

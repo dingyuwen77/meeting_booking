@@ -18,6 +18,11 @@ class IdentityError(ValueError):
     """请求没有可验证的企业微信成员身份。"""
 
 
+def is_valid_user_id(value: object) -> bool:
+    """仅校验 UserID 格式，不认证身份，也不裁剪或改写输入。"""
+    return isinstance(value, str) and _USER_ID.fullmatch(value) is not None
+
+
 @dataclass(frozen=True)
 class Actor:
     corp_id: str
@@ -69,9 +74,7 @@ def verify_identity(
             raise ValueError("身份签名已过期或尚未生效")
         if claims["corp_id"] != settings.corp_id:
             raise ValueError("企业身份不匹配")
-        if not isinstance(claims["user_id"], str) or not _USER_ID.fullmatch(
-            claims["user_id"]
-        ):
+        if not is_valid_user_id(claims["user_id"]):
             raise ValueError("用户标识格式不正确")
         name = claims["user_name"]
         if not isinstance(name, str) or not name.strip() or len(name) > 128:

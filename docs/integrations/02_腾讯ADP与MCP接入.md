@@ -2,7 +2,7 @@
 
 ## 目标、当前能力与外部缺口
 
-本仓库使用 Python MCP SDK v2 提供 Streamable HTTP 服务，具备 MCP `initialize`、`tools/list`、`tools/call` 的协议入口和 5 个 Tool；[tests/test_mcp_runtime.py](../../tests/test_mcp_runtime.py) 中有真实 SDK HTTP/ASGI 接线测试（会畅网络被 Mock）。**尚未有腾讯 ADP 租户真实握手、动态身份 Header 和企业微信端到端证据**，不能据此宣称在线应用已接入。
+本仓库使用 Python MCP SDK v2 提供 Streamable HTTP 服务，具备 MCP `initialize`、`tools/list`、`tools/call` 的协议入口，默认提供 5 个 Tool；临时身份参数探针开启后另增加 1 个。[tests/test_mcp_runtime.py](../../tests/test_mcp_runtime.py) 中有真实 SDK HTTP/ASGI 接线测试（会畅网络被 Mock）。**尚未有腾讯 ADP 租户真实握手、动态身份 Header 和企业微信端到端证据**，不能据此宣称在线应用已接入。
 
 ADP 端自定义 MCP 的配置方式请核对官方 [新建 MCP 工具](https://cloud.tencent.com/document/product/1759/117855) 文档及当前租户实际能力；本仓库不维护在线 ADP 画布或企微网关。
 
@@ -15,8 +15,32 @@ ADP 端自定义 MCP 的配置方式请核对官方 [新建 MCP 工具](https://
 | `submit_meeting_request` | CREATE/CHECK/UPDATE；外层参数名 `request` | 需要 |
 | `continue_meeting_request` | 按 pending 与 revision 补参、选项或取消申请 | 需要 |
 | `get_meeting_operation` | 读取同用户原操作状态，不重复执行会畅写入 | 需要 |
+| `identity_binding_probe`（默认关闭） | 原样回显 `actor_user_id`，仅用于参数传递 POC | 专用静态 Header，不认证员工 |
 
 五份机器消息契约来自 [src/meeting_reservation/schemas/](../../src/meeting_reservation/schemas/)，MCP `tools/list` 的业务 Tool Schema 是自动展开引用后的投影；`structuredContent` 返回业务结果。实现见 [src/meeting_reservation/mcp_server.py](../../src/meeting_reservation/mcp_server.py)。
+
+## 临时身份参数传递 POC
+
+这个探针回答“ADP 实际传来了哪个 UserID”，用于逐层核对参数绑定。它不证明 UserID 来自可信员工：持有探针密钥的调用方仍能自行填写参数。业务认证继续使用原 HMAC Header；不得将 POC 成功视为生产身份方案已成立。
+
+本地开启、密钥规则和关闭方式见 [docs/operations/01_本地运行与调试.md](../operations/01_本地运行与调试.md)。ADP 测试连接器使用可达的 HTTPS `/mcp` 地址，并通过自定义 Header `X-Meeting-Identity-Probe-Key` 传入同一专用密钥。只将 `identity_binding_probe` 添加到独立测试 Agent，保持 `MEETING_WRITE_ENABLED=false`。密钥不放在工具参数、Prompt、对话或 Git 中。
+
+输入示例为 `{"actor_user_id":"EMPLOYEE_A"}`；认证通过且格式合法时，`structuredContent` 返回：
+
+```json
+{
+  "success": true,
+  "mcp_client_authenticated": true,
+  "received_user_id": "EMPLOYEE_A",
+  "probe_only": true
+}
+```
+
+`mcp_client_authenticated` 仅表示本次请求持有专用静态密钥。缺失/错误 Header 或非法 UserID 返回 MCP Tool 错误（`isError=true`），不会返回成功身份结果。实现位于 [src/meeting_reservation/identity_probe.py](../../src/meeting_reservation/identity_probe.py)，不调用会议业务服务、不访问 SQLite 或会畅、不新增会议业务 Schema。
+
+按 POC 方案，拟在 ADP 中把必填参数 `actor_user_id` 绑定到 `API.VisitorBizId` 并关闭模型可见性；**该变量绑定及隐藏参数的实际效果仍需当前租户实测**。使用独立会话分别传入测试用户 A、B，核对真实工具结果，再尝试在聊天中声称自己是另一个用户，检查参数是否仍保持当前会话用户。还需验证缺失/错误探针 Header 被拒绝。不要仅凭助手生成的自然语言判定通过。
+
+探针本地回显、ADP 参数绑定、企业微信真实身份来源是三个不同验收层；完成前一层不会自动证明后一层。POC 完成后关闭开关并重启服务，移除 ADP 工具绑定与专用密钥；若连接器缓存工具列表，重新发现工具。
 
 ## 按依赖顺序的联调流程
 

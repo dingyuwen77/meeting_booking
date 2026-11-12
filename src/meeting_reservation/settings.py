@@ -1,7 +1,24 @@
 """服务端配置：所有真实凭据和写入开关均来自运行环境。"""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass(frozen=True)
+class IdentityProbeSettings:
+    """临时参数探针的独立配置，不读取会议或供应商配置。"""
+
+    enabled: bool = False
+    key: str = field(default="", repr=False)
+
+    @classmethod
+    def from_env(cls) -> "IdentityProbeSettings":
+        """只在显式开启时要求可安全放入 Header 的随机密钥。"""
+        enabled = os.getenv("MEETING_IDENTITY_PROBE_ENABLED", "").lower() == "true"
+        key = os.getenv("MEETING_IDENTITY_PROBE_KEY", "") if enabled else ""
+        if enabled and (len(key) < 32 or not all("!" <= char <= "~" for char in key)):
+            raise ValueError("MEETING_IDENTITY_PROBE_KEY 必须为至少 32 个非空白可打印 ASCII 字符")
+        return cls(enabled=enabled, key=key)
 
 
 @dataclass(frozen=True)

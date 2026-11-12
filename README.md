@@ -31,6 +31,8 @@ python -m meeting_reservation.mcp_server
 
 业务操作必须经可信网关签发的动态身份 Header 验证；**企微 UserID 原样作为会畅 userId，不代表 UserID 本身可用来认证**。真实写入须在独立环境完成权限、身份、会畅、ADP 与企微验收后按授权启用。
 
+临时身份参数 POC 可单独开启 `identity_binding_probe`，通过专用静态 Header 校验后回显 `actor_user_id`，不访问业务台账或会畅。它默认关闭，不能用于员工身份认证；开启、调用和关闭方式见 [docs/operations/01_本地运行与调试.md](docs/operations/01_本地运行与调试.md)。
+
 ## 文档入口
 
 | 需要做的事 | 从这里开始 |
